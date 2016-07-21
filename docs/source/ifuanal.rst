@@ -1,7 +1,6 @@
-ifuanal module
+ifuanal API
 ==============
 
 .. automodule:: ifuanal
     :members:
-    :undoc-members:
     :show-inheritance:

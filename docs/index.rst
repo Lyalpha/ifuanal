@@ -16,7 +16,7 @@ Contents:
    tutorial
    changelog
    license
-
+   source/ifuanal
 
 
 Indices and tables

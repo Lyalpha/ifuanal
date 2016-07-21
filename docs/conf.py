@@ -18,19 +18,8 @@
 #
 import os
 import sys
-#sys.path.insert(0, os.path.abspath('.'))
 sys.path.insert(0, os.path.abspath('../'))
-#sys.path.insert(0, os.path.abspath('../voronoi'))
 
-# for readthedocs autodoc compatibility
-#from mock import Mock as MagicMock
-#class Mock(MagicMock):
-#    @classmethod
-#    def __getattr__(cls, name):
-#            return Mock()
-#MOCK_MODULES = ['astropy.constants', 'astropy.coordinates', 'astropy.io', 'astropy.modeling', 'astropy.units', 'astropy.wcs', 'matplotlib.pyplot', 'matplotlib.ticker', 'matplotlib', 'mpl_toolkits.axes_grid1', 'numpy', 'dill', 'pathos.multiprocessing']
-#for mod_name in MOCK_MODULES:
-#    sys.modules[mod_name] = Mock()
 
 # -- General configuration ------------------------------------------------
 
