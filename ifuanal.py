@@ -1490,39 +1490,39 @@ class EmissionLineModel(models.Gaussian1D + models.Gaussian1D +
 
                 
 class MUSECube(IFUCube):
+    """
+    A Child class of IFUCube tailored for MUSE data cubes.
+
+    Handles the conversion of the ERR extension (which is natively the
+    variance) to std dev. Adds two headers used by IFUCube: IFU_EBV, IFU_Z.
+
+    Parameters
+    ----------
+    muse_cube : str
+        The filepath of the MUSE cube to analyse
+    redshift : float
+        The redshift of the observed host
+    ebv : str or float, optional
+        The value of Galactic extinction towards the hosts. The special
+        case "IRSA" will contact the NASA IRSA service and automatically
+        grab the value based on [2]_.
+    RV : float, optional
+        The RV value to use for the CCM extinction law.
+    vor_sn : float, optional
+        The target signal-to-noise of the voronoi binning algorithm.
+    sl_dir : None or str, optional
+        The directory containing starlight files and bases. The default
+    ``None`` will use the `starlight/` subdirectory.
+
+
+    References
+    ----------
+    .. [2] Schlafly, E & Finkbeiner, D, "Measuring Reddening with Sloan 
+    Digital Sky Survey Stellar Spectra and Recalibrating SFD", ApJ, 2011
+
+    """
     def __init__(self, muse_cube, redshift, ebv="IRSA", RV=3.1, vor_sn=20,
                  sl_dir=None):
-        """
-        A Child class of IFUCube tailored for MUSE data cubes.
-
-        Handles the conversion of the ERR extension (which is natively the
-        variance) to std dev. Adds two headers used by IFUCube: IFU_EBV, IFU_Z.
-
-        Parameters
-        ----------
-        muse_cube : str
-            The filepath of the MUSE cube to analyse
-        redshift : float
-            The redshift of the observed host
-        ebv : str or float, optional
-            The value of Galactic extinction towards the hosts. The special
-            case "IRSA" will contact the NASA IRSA service and automatically
-            grab the value based on [2]_.
-        RV : float, optional
-            The RV value to use for the CCM extinction law.
-        vor_sn : float, optional
-            The target signal-to-noise of the voronoi binning algorithm.
-        sl_dir : None or str, optional
-            The directory containing starlight files and bases. The default
-        ``None`` will use the `starlight/` subdirectory.
-
-
-        References
-        ----------
-        .. [2] Schlafly, E & Finkbeiner, D, "Measuring Reddening with Sloan 
-        Digital Sky Survey Stellar Spectra and Recalibrating SFD", ApJ, 2011
-
-        """
         cube_hdu = fits.open(muse_cube)
         base_name = os.path.splitext(muse_cube)[0]
         if base_name.endswith(".fits"):

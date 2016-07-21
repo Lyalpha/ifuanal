@@ -32,7 +32,7 @@ STARLIGHT installation
 The STARLIGHT executable suitable for your system should be downloaded from
 `here <http://astro.ufsc.br/starlight/node/3>`_. This should be copied (or linked) in to the `starlight/` subdirectory of the ifuanal project directory with the exact file name ``StarlightChains_v04.exe`` so that the code can find it.
 
-ifuanal comes bundled with a set of model bases from Bruzual & Charlot (2003), although others can added manually (see the :ref:`Tutorial <cont-fitting>`).
+ifuanal comes bundled with a set of model bases from Bruzual & Charlot (2003), although others can be added manually (see the :ref:`Tutorial <cont-fitting>`).
 
 Setup
 -----
