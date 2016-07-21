@@ -1,0 +1,6 @@
+astropy
+numpy
+scipy
+matplotlib
+dill
+pathos
