@@ -1,7 +1,7 @@
 """
 IFUANAL
 
-For the analysis of IFU data cubes
+For the analysis of IFU data cubes.
 """
 
 __version__ = "0.1.0"
@@ -26,10 +26,10 @@ import astropy.units as u
 import astropy.wcs as wcs
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
-from matplotlib import gridspec, ticker, cm, colors
-from matplotlib import rc
+from matplotlib import gridspec, ticker, cm, colors, rc
 from mpl_toolkits.axes_grid1 import AxesGrid
 import numpy as np
+from scipy.interpolate import interp1d
 
 from voronoi import voronoi
 import dill as pickle
@@ -59,6 +59,7 @@ ckms = c.to("km/s").value
 # Make plots prettier
 rc('font',**{'family':'serif','serif':['Times New Roman'],'size':14})
 rc('text', usetex=True)
+rc('image', cmap='viridis')
 
 #TODOs
 
@@ -98,6 +99,37 @@ rc('text', usetex=True)
 #          used/added
 
 class IFUCube(object):
+    """
+    Parent to be called by initialisation of child.
+
+    Parameters
+    ----------
+    data_cube : ``astropy.io.fits.ImageHDU`
+        The data extension of the IFU FITS file.
+    stddev_cube : ``astropy.io.fits.ImageHDU`
+        The uncertainty (standard deviation) extension of the IFU FITS file.
+    base_name : str
+        The base name to be used for all output.
+    redshift : float
+        The redshift of the observed host.
+    ebv : str or float, optional
+        The value of Galactic extinction towards the hosts. The special
+        case "IRSA" will contact the NASA IRSA service and automatically
+        grab the value based on [2]_.
+    RV : float, optional
+        The RV value to use for the CCM extinction law.
+    vor_sn : float, optional
+        The target signal-to-noise of the voronoi binning algorithm.
+    sl_dir : None or str, optional
+        The directory containing starlight files and bases. The default
+        ``None`` will use the `starlight/` subdirectory.
+
+
+    References
+    ----------
+    .. [2] Schlafly, E & Finkbeiner, D, "Measuring Reddening with Sloan
+       Digital Sky Survey Stellar Spectra and Recalibrating SFD", ApJ, 2011
+    """
     def __init__(self, data_cube, stddev_cube, base_name, RV=3.1, vor_sn=20,
                  sl_dir=None):
 
@@ -303,7 +335,7 @@ class IFUCube(object):
                 vals, title = vt
                 plt.subplot(1, 3, i)
                 plt.imshow(vals, origin='lower', interpolation='nearest', 
-                           vmin=np.min(z), vmax=1., cmap="YlOrRd")
+                           vmin=np.min(z), vmax=1.)
                 plt.autoscale(False)
                 plt.plot(g.x_mean, g.y_mean, "kx", markersize=10)
                 plt.gca().get_xaxis().set_visible(False)
@@ -448,7 +480,58 @@ class IFUCube(object):
         self.bin_sn = bin_sn
         self.vor_output = vor_output
 
+
+    def emission_line_bin(self, min_peak_flux, min_frac_flux, max_radius,
+                          min_flux, **kwargs):
+        """
+        Apply the HII explorer[3]_ binning algorithm to the datacube.
+
+        This method will bin spaxels by attempting to determine distinct
+        emission line regions. An emission line map (usually H:math:`\\alpha`)
+        is created by :func:`~ifuanal.get_line_map`` through subtraction of a
+        continuum from a narrow band filter centred on the emission line. Peaks
+        above ``min_peak_flux`` in the emission line map are seeds for bins
+        which are expanded so long as neighbouring spaxels are above
+        ``min_frac_flux`` of the peak and within ``max_radius``
+        distance. Pixels below ``min_flux`` are excluded from binning.
+
+        See :func:`~ifuanal.get_line_map` for more information on the kwargs
+        used to define the wavelength windows of the line and continuum.
+
+        Parameters
+        ----------
+        min_peak_flux : float
+            The minimum flux (in what units?!) for a spaxel to be considered as
+            a new bin seed.
+        min_frac_flux : float
+            The minimum flux of a spaxel, as a fraction of the bin's peak flux,
+            to be considered a member of the bin.
+        max_radius : float
+            The maximum radius (in what units?!) allowed for a bin.
+        min_flux : float
+            The minimum flux of a spaxel for consideration in the binning
+            routine.
+        line_mean : float
+            The central wavelength of the emission line to extract (in units of
+            ``data_cube``'s header.
+        filter_width : float
+            The filter width to extract around the emission line.
+        cont_width : float
+            The width of the wavelength window to extract either side of the
+            filter to define the continuum.
+        cont_pad :
+            The padding to apply between the edge of the filter and the start
+            of continuum window.
+
+        References
+        ----------
+        .. [3] S.F. Sanchez, HII_explorer,
+           http://www.caha.es/sanchez/HII_explorer/
+        """
+        pass
+
     def add_custom_bin(self, centre, r):
+
         """
         Create a custom bin to analyse in addition to the vonoroi bins.
 
@@ -1369,7 +1452,7 @@ class IFUCube(object):
 
         plt.close("all")
         plt.imshow(Z, origin="lower", interpolation="none", vmin=vmin,
-                   vmax=vmax, cmap="viridis")
+                   vmax=vmax)
         plt.colorbar(label="$Z$ [$12 + \log_{10}(\\textrm{O}/\\textrm{H})$]",
                      orientation="horizontal").ax.tick_params(labelsize=16)
         plt.plot(self.nucleus[0], self.nucleus[1], "kx", markersize=10)
@@ -1482,19 +1565,18 @@ class EmissionLineModel(models.Gaussian1D + models.Gaussian1D +
                         models.Gaussian1D + models.Gaussian1D +
                         models.Gaussian1D + models.Gaussian1D +
                         models.Gaussian1D + models.Gaussian1D):
-    """
-    Used to explicitly define the emission line compond model in the module,
-    otherwise dill/pickle face difficulties relating to namespace issues
-    """
+    # Used to explicitly define the emission line compond model in the module,
+    # otherwise dill/pickle face difficulties relating to namespace issues
     pass
 
                 
 class MUSECube(IFUCube):
     """
-    A Child class of IFUCube tailored for MUSE data cubes.
+    A Child class of :class:`~ifuanal.IFUCube` tailored for MUSE data cubes.
 
     Handles the conversion of the ERR extension (which is natively the
-    variance) to std dev. Adds two headers used by IFUCube: IFU_EBV, IFU_Z.
+    variance) to std dev. Adds two headers used by :class:`~ifuanal.IFUCube`:
+    IFU_EBV, IFU_Z.
 
     Parameters
     ----------
@@ -1512,13 +1594,13 @@ class MUSECube(IFUCube):
         The target signal-to-noise of the voronoi binning algorithm.
     sl_dir : None or str, optional
         The directory containing starlight files and bases. The default
-    ``None`` will use the `starlight/` subdirectory.
+        ``None`` will use the `starlight/` subdirectory.
 
 
     References
     ----------
-    .. [2] Schlafly, E & Finkbeiner, D, "Measuring Reddening with Sloan 
-    Digital Sky Survey Stellar Spectra and Recalibrating SFD", ApJ, 2011
+    .. [2] Schlafly, E & Finkbeiner, D, "Measuring Reddening with Sloan
+       Digital Sky Survey Stellar Spectra and Recalibrating SFD", ApJ, 2011
 
     """
     def __init__(self, muse_cube, redshift, ebv="IRSA", RV=3.1, vor_sn=20,
@@ -1610,16 +1692,23 @@ def get_Alamb(lamb, ebv, RV=3.1, lamb_unit=u.Unit("angstrom")):
     return Alamb
 
 
-def get_emission_line_segmap(data_cube, line_mean, filter_width=60, cont_width=60,
-                             cont_pad=60):
+def get_line_map(data_cube, lamb, line_mean, filter_width=60, cont_width=60,
+                 cont_pad=30):
     """
-    Return a 2D segmentation map image of ``data_cube`` for emission line
-    regions using the algorithm of [3]_.
+    Calculates a 2D continuum-subtracted emission line map.
+
+    The 2D line map is a collapse of ``data_cube`` along the spectral axis over
+    a filter, centred at ``line_mean`` with width ``filter_width``. The
+    continuum is estimated by interpolating from two neighbouring wavelength
+    windows. The line only map is the filter map minus the interpolated value
+    of the continuum.
 
     Parameters
     ----------
     data_cube : :class:`astropy.io.fits.ImageHDU`
         The data cube extension from which to extract the segmentation map.
+    lamb : array-like
+        The wavelengths of the datacube spectral axis.
     line_mean : float
         The central wavelength of the emission line to extract (in units of
     ``data_cube``'s header.
@@ -1632,13 +1721,49 @@ def get_emission_line_segmap(data_cube, line_mean, filter_width=60, cont_width=6
         The padding to apply between the edge of the filter and the start of
     continuum window.
 
-
-
-    References
-    ----------
-    .. [3] S.F. Sanchez, HII_explorer, http://www.caha.es/sanchez/HII_explorer/
-
+    Returns
+    -------
+    2d_maps : list
+        A length-4 list of 2D maps of the [blue continuum, red continuum,
+        filter, line only (i.e. filter - continuum)], respectively.
     """
+
+    # Find edges of filter and continuum windows
+    low_filt = line_mean - filter_width/2.
+    upp_filt = line_mean + filter_width/2.
+    low_cont1 = low_filt - cont_pad - cont_width
+    upp_cont1 = low_filt - cont_pad
+    low_cont2 = upp_filt + cont_pad
+    upp_cont2 = upp_filt + cont_pad + cont_width
+    # Find the nearest sampled wavelengths to our limits
+    idx_low_filt = np.abs(lamb - low_filt).argmin()
+    idx_upp_filt = np.abs(lamb - upp_filt).argmin() + 1
+    idx_low_cont1 = np.abs(lamb - low_cont1).argmin()
+    idx_upp_cont1 = np.abs(lamb - upp_cont1).argmin() + 1
+    idx_low_cont2 = np.abs(lamb - low_cont2).argmin()
+    idx_upp_cont2 = np.abs(lamb - upp_cont2).argmin() + 1
+
+    # Make maps of the three wavelength windows by averaging
+    # over the spectral axis
+    filter_map = np.average(data_cube.data[idx_low_filt:idx_upp_filt, :, :],
+                          axis=0)
+    cont1_map = np.average(data_cube.data[idx_low_cont1:idx_upp_cont1, :, :],
+                          axis=0)
+    cont2_map = np.average(data_cube.data[idx_low_cont2:idx_upp_cont2, :, :],
+                          axis=0)
+
+    # Determine the mean wavelength of the continuum windows
+    cont1_mean = np.average((low_cont1, upp_cont1))
+    cont2_mean = np.average((low_cont2, upp_cont2))
+    # Interpolate their values to estimate continuum at line
+    cont_interp = interp1d([cont1_mean, cont2_mean], [cont1_map, cont2_map],
+                           axis=0)
+    cont_at_line_mean = cont_interp(line_mean)
+    # Subtract this continuum
+    line_map = filter_map - cont_at_line_mean
+
+    return [cont1_map, cont2_map, filter_map, line_map]
+
 
 
 def resample_base(basefile, obs_lamb, delta_lamb, buffer_lamb=500):
