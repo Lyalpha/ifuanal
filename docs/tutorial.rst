@@ -2,11 +2,12 @@ Tutorial
 ========
 
 ifuanal requires a reduced (i.e. sky-subtracted, flux- and
-wavelength-calibrated) datacube as ingestion.
+wavelength-calibrated) datacube as ingestion. Wavelength scale should be in
+angstroms.
 
-This tutorial will use an example workflow that performs :ref:`stellar continuum
-and emission line fitting <fitting>` and subsequent :ref:`analysis <analysis>`
-on a MUSE data cube.
+This tutorial will use an example workflow that performs :ref:`stellar
+continuum <cont-fitting>` and :ref:`emission line <emission-fitting>` fitting and
+subsequent :ref:`analysis <analysis>` on a MUSE data cube.
 
 A description of the processes in each step as well as some of the pertinent
 arguments. For a full description of optional arguments and their format, see
@@ -34,15 +35,11 @@ standard). Any files produced are defined in this tutorial by their suffix. The 
    * :meth:`class_method`
    * ``variable_name`` (or ``argument_name``)
 
-.. _fitting:
-
-Fitting
--------
-
-For this example we will use the MUSE science verification target **NGC2906**.
 
 Create a new instance
-^^^^^^^^^^^^^^^^^^^^^
+---------------------
+
+For this example we will use the MUSE science verification target **NGC2906**.
 
 ::
 
@@ -77,7 +74,7 @@ from `data/emission_lines.json`
 .. _deredden-deredshift:
 
 Deredden and deredshift
-^^^^^^^^^^^^^^^^^^^^^^^
+-----------------------
 
 ::
 
@@ -97,7 +94,7 @@ subsequent calls will not do anything to the cube, e.g.::
 The wavelength array under :attr:`lamb` is updated with the deredshifting.
 
 Mask foregound/background sources
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+---------------------------------
 
 We can remove spaxels from the data cube (by setting their values to ``np.nan``)
 to ensure they are not considered in subsequent analysis. For NGC2906 there is a
@@ -116,7 +113,7 @@ multiple regions::
   >>> # cube.mask_regions([(10, 20), (30, 40), (50, 60)], [12, 10, 8])
 
 Find the galaxy centre
-^^^^^^^^^^^^^^^^^^^^^^
+----------------------
 
 We need to provide an initial guess to find centre of the galaxy, usually by
 simply eyeballing the cube. This can be given in pixel coordinates or RA and DEC
@@ -140,10 +137,10 @@ and residual for checking.
    maps in terms of offset from the centre.
 
 Binning the spaxels
-^^^^^^^^^^^^^^^^^^^
+-------------------
 
 Voronoi binning
-"""""""""""""""
+^^^^^^^^^^^^^^^
 
 We do not want to consider sky spaxels in our analysis and, additionally, we do
 not want to perform fitting to low signal-to-noise ratio (SNR) spaxels. To
@@ -154,7 +151,7 @@ using the `Voronoi binning algorithm
 remaining spaxels. The individual spectra in each bin are combined to increase
 the SNR to some target value.
 
-The SNR of the spectra are calculated in a specific wavelength window (default is 5590 to 5680\ :math:`\AA`) and
+The SNR of the spectra are calculated in a specific wavelength window (default is 5590 to 5680) and
 emission line signal-to-noise ratios can be estimated by subtracting off a
 continuum SNR (see docs for :meth:`~ifuanal.IFUCube.voronoi_bin`) ::
 
@@ -175,7 +172,7 @@ calculating (regardless of whether new arguments are passed to the method). Set 
 their SNRs.
 
 HII region binning
-""""""""""""""""""
+^^^^^^^^^^^^^^^^^^
 
 .. TODO::
    
@@ -185,7 +182,7 @@ HII region binning
 .. _custom-bins:
 
 Adding custom bins
-""""""""""""""""""
+^^^^^^^^^^^^^^^^^^
 
 Custom bins can be added by defining a centre and radius. These bins will have
 negative bin numbers beginning at -1 in results.
@@ -209,7 +206,7 @@ where 0.2 is the pixel scale of MUSE in arcsecs. Once all fitting has been perfo
 .. _cont-fitting:
 
 Stellar continuum fitting
-^^^^^^^^^^^^^^^^^^^^^^^^^
+-------------------------
 
 Stellar continuum fitting is performed via `STARLIGHT
 <http://astro.ufsc.br/starlight/>`_ (see :ref:`starlight-install`). 
@@ -276,7 +273,7 @@ emission line fitting).
 .. _emission-fitting:
 
 Emission line fitting
-^^^^^^^^^^^^^^^^^^^^^
+---------------------
 
 Emission line fitting is done with a set of single gaussians, one for each of
 the lines given in `data/emission_lines.json`.
@@ -368,8 +365,8 @@ can do all this fancy stuff...
 
 .. _results-dict:
 
-results dictionary
-^^^^^^^^^^^^^^^^^^
+:attr:`results` dictionary
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 As an example, to see the results for a bin of number
 ``bn``, type:::
 
@@ -382,7 +379,7 @@ The ``results`` dictionary contains
    Write this section.
 
 
-plotting
+Plotting
 ^^^^^^^^
 
 Once all fitting has been done, maps of the bins with various quantities can be
