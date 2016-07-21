@@ -323,7 +323,7 @@ class IFUCube(object):
         ``vor_sn``. S/N calculation is performed in the wavelength window given
         by ``lamb_low`` and ``lamb_upp``. Only spaxels that have S/N >=
         ``min_sn`` will be considered for binning. This will write results in a
-        file with the suffix "_voronoibins.txt".
+        file with the suffix `_voronoibins.txt`.
 
         Emission line signal to noise can be calculated by specifying
         ``cont_lamb_low`` and ``cont_lamb_upp``. In this case the S/N in this
@@ -628,7 +628,7 @@ class IFUCube(object):
         """
         Run the starlight fitting of spectra in the cube.
         
-        This method will create a file with the suffix "_sloutputs.txt" which
+        This method will create a file with the suffix `_sloutputs.txt` which
         gives the bin numbers and their corresponding starlight output files.
         If a run has been previously performed, the contents of this file can
         be read - however the files containing the starlight output must
@@ -654,7 +654,7 @@ class IFUCube(object):
             previous temporary directory used can be given and the resampled
             bases in there will be used (defaults to None).
         clobber : bool, optional
-            Whether to overwrite the "_sloutput.txt" output if it exists. If
+            Whether to overwrite the `_sloutput.txt` output if it exists. If
             this file exists and ``clobber = False`` then its contents are read
             and ``parse_starlight`` will use the pre-existing output files
             (defaults to False).
@@ -962,7 +962,7 @@ class IFUCube(object):
 
         The plotted values are based on the light fraction results of the 
         starlight continuum fitting. Nan or negative values are shown as white.
-        The plot is saved with suffix "_yio.pdf".
+        The plot is saved with suffix `_yio.pdf`.
 
         Parameters
         ----------
@@ -1031,7 +1031,7 @@ class IFUCube(object):
 
         The plotted values are based on the velocity offset and dispersion
         results of the starlight continuum fitting. Nan or negative values are 
-        shown as white. The plot is saved with suffix "_kinematics.pdf".
+        shown as white. The plot is saved with suffix `_kinematics.pdf`.
 
         Parameters
         ----------
