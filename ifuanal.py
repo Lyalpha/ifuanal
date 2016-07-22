@@ -104,18 +104,12 @@ class IFUCube(object):
 
     Parameters
     ----------
-    data_cube : ``astropy.io.fits.ImageHDU`
+    data_cube : :class:`astropy.io.fits.ImageHDU`
         The data extension of the IFU FITS file.
-    stddev_cube : ``astropy.io.fits.ImageHDU`
+    stddev_cube : :class:`astropy.io.fits.ImageHDU`
         The uncertainty (standard deviation) extension of the IFU FITS file.
     base_name : str
         The base name to be used for all output.
-    redshift : float
-        The redshift of the observed host.
-    ebv : str or float, optional
-        The value of Galactic extinction towards the hosts. The special
-        case "IRSA" will contact the NASA IRSA service and automatically
-        grab the value based on [2]_.
     RV : float, optional
         The RV value to use for the CCM extinction law.
     vor_sn : float, optional
@@ -123,12 +117,6 @@ class IFUCube(object):
     sl_dir : None or str, optional
         The directory containing starlight files and bases. The default
         ``None`` will use the `starlight/` subdirectory.
-
-
-    References
-    ----------
-    .. [2] Schlafly, E & Finkbeiner, D, "Measuring Reddening with Sloan
-       Digital Sky Survey Stellar Spectra and Recalibrating SFD", ApJ, 2011
     """
     def __init__(self, data_cube, stddev_cube, base_name, RV=3.1, vor_sn=20,
                  sl_dir=None):
@@ -387,9 +375,9 @@ class IFUCube(object):
 
         References
         ----------
-        Uses the algorithm of [1]_.
+        Uses the algorithm of [CC03]_.
 
-        .. [1] Cappellari, M & Copin, Y, "Adaptive spatial binning of 
+        .. [CC03] Cappellari, M & Copin, Y, "Adaptive spatial binning of 
            integral-field spectroscopic data using Voronoi tessellations",
            MNRAS, 2003.
 
@@ -484,7 +472,7 @@ class IFUCube(object):
     def emission_line_bin(self, min_peak_flux, min_frac_flux, max_radius,
                           min_flux, **kwargs):
         """
-        Apply the HII explorer[3]_ binning algorithm to the datacube.
+        Apply the HII explorer [SFS]_ binning algorithm to the datacube.
 
         This method will bin spaxels by attempting to determine distinct
         emission line regions. An emission line map (usually H:math:`\\alpha`)
@@ -525,10 +513,10 @@ class IFUCube(object):
 
         References
         ----------
-        .. [3] S.F. Sanchez, HII_explorer,
+        .. [SFS] S.F. Sanchez, HII_explorer,
            http://www.caha.es/sanchez/HII_explorer/
         """
-        pass
+        pass #TODO #TODO #TODO #TODO #TODO 
 
     def add_custom_bin(self, centre, r):
 
@@ -1587,7 +1575,7 @@ class MUSECube(IFUCube):
     ebv : str or float, optional
         The value of Galactic extinction towards the hosts. The special
         case "IRSA" will contact the NASA IRSA service and automatically
-        grab the value based on [2]_.
+        grab the value based on [SF11]_.
     RV : float, optional
         The RV value to use for the CCM extinction law.
     vor_sn : float, optional
@@ -1599,7 +1587,7 @@ class MUSECube(IFUCube):
 
     References
     ----------
-    .. [2] Schlafly, E & Finkbeiner, D, "Measuring Reddening with Sloan
+    .. [SF11] Schlafly, E & Finkbeiner, D, "Measuring Reddening with Sloan\
        Digital Sky Survey Stellar Spectra and Recalibrating SFD", ApJ, 2011
 
     """
@@ -1632,8 +1620,8 @@ class MUSECube(IFUCube):
 
 def get_IRSA_ebv(header):
     """
-    Retrieve the S&F 2011 Galactic EBV for the reference pixel coordinates in 
-    a FITS header.
+    Retrieve the S&F 2011 Galactic E(B-V) for the reference pixel
+    coordinates in a FITS header.
     """
 
     from astroquery.irsa_dust import IrsaDust
@@ -1648,7 +1636,13 @@ def get_IRSA_ebv(header):
 
 def get_Alamb(lamb, ebv, RV=3.1, lamb_unit=u.Unit("angstrom")):
     """
-    Return the wavelength dependant extinction for the input lambda array.
+    Return the wavelength dependant extinction for the input lambda array
+    using the polynomial of [CCM89]_
+
+    References
+    ----------
+    .. [CCM89] Cardelli, Clayton \& Mathis, 1989, ApJ, 345, 245, "The \
+       relationship between infrared, optical, and ultraviolet extinction"
     """
     # x in CCM is in 1/microns
     x = 1/(lamb * lamb_unit.to("micron"))
