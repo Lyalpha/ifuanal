@@ -10,11 +10,13 @@ continuum <cont-fitting>` and :ref:`emission line <emission-fitting>` fitting an
 subsequent :ref:`analysis <analysis>` on a MUSE data cube.
 
 A description of the processes in each step as well as some of the pertinent
-arguments. For a full description of optional arguments and their format, see
-the documentation of the methods themselves (or type ``object?`` from within an
-IPython session to find out about ``object``). All pixel-coordinates should be
-passed to methods as zero-indexed in the order ``x``, ``y`` (in the FITS
-standard). Any files produced are defined in this tutorial by their suffix. The prefix will be that of the cube being analysed (minus the filename extension).
+arguments is given below. For a full description of optional arguments and
+their format, see the :ref:`api documentation of the methods <ifuanal-api>` (or type
+``object?`` from within an IPython session to find out about ``object``). All
+pixel-coordinates should be passed to methods as zero-indexed in the order
+``x``, ``y`` (in the FITS standard). Any files produced are defined in this
+tutorial by their `suffix.extension`. The prefix will be that of the cube being analysed
+(minus the filename extension).
 
 .. NOTE::
 
@@ -39,16 +41,18 @@ standard). Any files produced are defined in this tutorial by their suffix. The 
 Create a new instance
 ---------------------
 
-For this example we will use the MUSE science verification target **NGC2906**.
+For this example MUSE science verification data of the target **NGC2906** will be analysed.
 
 ::
 
   >>> import ifuanal 
   >>> cube = ifuanal.MUSECube("NGC2906.fits", 0.008138)
 
-This will initialise the ``MUSECube`` class, which does some small manipulation
-to the MUSE data cube before ingestion to ``IFUCube``, namely:
+This will initialise the :class:`~ifuanal.MUSECube` class, which does some
+small manipulation to the MUSE FITS file input before ingestion to
+:class:`~ifuanal.IFUCube`, namely:
 
+* Split the MUSE FITS file into its `DATA` and `STAT` extensions.
 * Add a header card `IFU_EBV` specifying the reddening. The argument ``ebv`` can
   be passed to :class:`~ifuanal.MUSECube` to explicitly set this, otherwise its default value
   of "IRSA" will contact the Infrared Science Archive to automatically determine
@@ -60,8 +64,8 @@ to the MUSE data cube before ingestion to ``IFUCube``, namely:
   data. ``IFUCube`` wants the standard deviation and so we square root this
   extension.
 
-``IFUCube`` is then initialised which will set up out wavelength scale, check
-our STARLIGHT directory (:attr:`sl_dir`) exists, and load the emission line data
+``IFUCube`` is then initialised which will set up the wavelength scale, check
+the STARLIGHT directory (:attr:`sl_dir`) exists, and load the emission line data
 from `data/emission_lines.json`
 
 .. WARNING::
@@ -84,14 +88,21 @@ Deredden and deredshift
   deredshifting from z = 0.008138
 
 These are pretty self-explanatory. One thing to note is that the `E(B-V)` and
-`z` values are taken from header cards ``IFU_EBV`` and ``IFU_Z``, respectively. Once
-the method has been called the appropriate header values is set to `0` and
-subsequent calls will not do anything to the cube, e.g.::
+`z` values are taken from header cards ``IFU_EBV`` and ``IFU_Z``,
+respectively. Dereddening is done using a Cardelli, Clayton and Mathis (1989)
+polynomial.
+
+Once either method has been called the appropriate header values is
+set to `0` and subsequent calls will not do anything to the cube, e.g.::
 
   >>> cube.deredden()
   ebv = 0, skipping deredden()
 
-The wavelength array under :attr:`lamb` is updated with the deredshifting.
+The wavelength array attribute :attr:`lamb` is updated with the deredshifting:
+::
+
+  >>> print("{:.2f}, {:.2f}".format(cube.lamb[0], cube.lamb[-1]))
+  4711.66, 9274.52
 
 Mask foregound/background sources
 ---------------------------------
@@ -107,28 +118,35 @@ foreground star in our cube, which we want to mask: ::
 and ``12`` is the radius of the mask in pixels. Note the coordinates of the
 regions should be given as a list of length-2 lists/tuples. The radius argument
 can be a list also, in order to specify a different radius for each region to
-mask (if len(regions) > len(radii) it will loop over the radii). e.g. for
-multiple regions::
+mask, or, if ``len(regions) > len(radii)`` it will loop over the radii. e.g. for
+multiple regions: ::
 
-  >>> # cube.mask_regions([(10, 20), (30, 40), (50, 60)], [12, 10, 8])
+  >>> # cube.mask_regions([(10, 20), (30, 40), (50, 60)], [8, 9, 10])
+
+will use radii of ``8``, ``9`` and ``10`` for the three regions, whereas: ::
+
+  >>> # cube.mask_regions([(10, 20), (30, 40), (50, 60)], 10)
+
+will use a radius of ``10`` for all regions.
+
 
 Find the galaxy centre
 ----------------------
 
 We need to provide an initial guess to find centre of the galaxy, usually by
-simply eyeballing the cube. This can be given in pixel coordinates or RA and DEC
-if ``usewcs`` is ``True``. The centre is found by fitting a 2D gaussian to a
-region around this initial guess.
+simply eyeballing the cube. This can be given in pixel coordinates or RA and
+DEC if the argument ``usewcs = True``. The centre is found by fitting a 2D
+gaussian to a region around this initial guess.
 
-If there are problems with the fitting, see the docs for
-:meth:`~ifuanal.IFUCube.set_nucleus` since there are other arguments to play
-with, as well as the option to specify a location outside the FOV. ::
+To resolve poor fits look at the docs for :meth:`~ifuanal.IFUCube.set_nucleus`,
+since there are other arguments to play with, as well as the option to specify
+a location outside the FOV. ::
 
   >>> cube.set_nucleus([162, 167])
   set nucleus as (160.592, 166.442)
 
 By default this will also produce a plot `_nucleus.pdf` showing the data, model
-and residual for checking.
+and residual for checking (``plot=False`` to skip this).
 
 .. TODO::
 
@@ -165,8 +183,9 @@ calculating (regardless of whether new arguments are passed to the method). Set 
 
 .. NOTE::
 
-   Although the voronoi bins can be reread from the `_voronoibins.txt` file,
-   any custom bins will be lost and need to be :ref:`readded <custom-bins>`.
+   Although the voronoi bins can be reread from the `_voronoibins.txt` file if
+   they have been previously calculated, any custom bins will be lost and need
+   to be :ref:`readded <custom-bins>`.
 
 `_voronoibins.pdf` will also be created for visual inspection of the bins and
 their SNRs.
