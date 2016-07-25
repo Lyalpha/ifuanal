@@ -1,0 +1,40 @@
+#TODOs
+
+#TODO    : generalise the emission line model to any emission_line.json input.
+#          add numbering to components in emission_lines.json with Halpha 0 and
+#          NII 1, then split by balmer and forbidden?  When constructing
+#          emissionline model need to rename them to the name of the lines?
+
+#TODO    : bin_inspection - i.e.: make a plot of all indiv specs in bin and the
+#          weighted spec, show location on voronoi plot, print results of
+#          fitting, overplot fit on weighted spec etc.
+
+#TODO    : make all bin numbers, the x/y coordinates, the weighted spec, the
+#          starlight outputs the error spec, the s/n of the bin etc. all in a
+#          big astropy table. Then can parse this easily for output analysis
+
+#TODO    : put all output into a subdir of the basedir instead
+
+#TODO    : output plots with RA/DEC instead of just pixels?
+
+#TODO    : add an option to the custom bin method that will simulate an SDSS
+#          fibre on the host.
+
+#TODO    : only calculate metallicities when its within bound of validity for
+#          the indicator (otherwise nan), and also propogate errors onto the
+#          value (excluding intrinsic scatter about the relations themselves).
+
+#TODO:     how to handle emission models that are fit but on limits of bounds
+#          correctly?  this produces a model nan uncerts. Should these be
+#          thrown out? Some testing needed to see if bounds are cutting out
+#          crap while not allowing good to make stupid fits.
+
+#TODO:     expose emission_lines as an argument to IFUCube so user can give own
+#          emission_lines.json file
+
+#TODO:     create data/metallicity_indicators.json for custom indicators to be
+#          used/added
+
+#TODO:     allow a low order polynomial/spline or linear continuum to be sub-
+#          tracted from the spectra after stellar continuum fitting and prior
+#          to emission line fitting?

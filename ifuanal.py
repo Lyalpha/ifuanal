@@ -61,42 +61,6 @@ rc('font',**{'family':'serif','serif':['Times New Roman'],'size':14})
 rc('text', usetex=True)
 rc('image', cmap='viridis')
 
-#TODOs
-
-#TODO    : generalise the emission line model to any emission_line.json input.
-#          add numbering to components in emission_lines.json with Halpha 0 and
-#          NII 1, then split by balmer and forbidden?  When constructing
-#          emissionline model need to rename them to the name of the lines?
-
-#TODO    : bin_inspection - i.e.: make a plot of all indiv specs in bin and the
-#          weighted spec, show location on voronoi plot, print results of
-#          fitting, overplot fit on weighted spec etc.
-
-#TODO    : make all bin numbers, the x/y coordinates, the weighted spec, the
-#          starlight outputs the error spec, the s/n of the bin etc. all in a
-#          big astropy table. Then can parse this easily for output analysis
-
-#TODO    : put all output into a subdir of the basedir instead
-
-#TODO    : output plots with RA/DEC instead of just pixels?
-
-#TODO    : add an option to the custom bin method that will simulate an SDSS
-#          fibre on the host.
-
-#TODO    : only calculate metallicities when its within bound of validity for
-#          the indicator (otherwise nan), and also propogate errors onto the
-#          value (excluding intrinsic scatter about the relations themselves).
-
-#TODO:     how to handle emission models that are fit but on limits of bounds
-#          correctly?  this produces a model nan uncerts. Should these be
-#          thrown out? Some testing needed to see if bounds are cutting out
-#          crap while not allowing good to make stupid fits.
-
-#TODO:     expose emission_lines as an argument to IFUCube so user can give own
-#          emission_lines.json file
-
-#TODO:     create data/metallicity_indicators.json for custom indicators to be
-#          used/added
 
 class IFUCube(object):
     """
@@ -470,7 +434,7 @@ class IFUCube(object):
 
 
     def emission_line_bin(self, min_peak_flux, min_frac_flux, max_radius,
-                          min_flux, **kwargs):
+                          min_flux, plot=True, **kwargs):
         """
         Apply the HII explorer [SFS]_ binning algorithm to the datacube.
 
@@ -484,7 +448,8 @@ class IFUCube(object):
         distance. Pixels below ``min_flux`` are excluded from binning.
 
         See :func:`~ifuanal.get_line_map` for more information on the kwargs
-        used to define the wavelength windows of the line and continuum.
+        used to define the wavelength windows of the line and continuum and
+        their defaults.
 
         Parameters
         ----------
@@ -499,15 +464,17 @@ class IFUCube(object):
         min_flux : float
             The minimum flux of a spaxel for consideration in the binning
             routine.
-        line_mean : float
+        plot : bool
+            Whether to make a plot of the continuum, filter, line and bin maps.
+        line_mean : float, optional
             The central wavelength of the emission line to extract (in units of
             ``data_cube``'s header.
-        filter_width : float
+        filter_width : float, optional
             The filter width to extract around the emission line.
-        cont_width : float
+        cont_width : float, optional
             The width of the wavelength window to extract either side of the
             filter to define the continuum.
-        cont_pad :
+        cont_pad : float, optional
             The padding to apply between the edge of the filter and the start
             of continuum window.
 
@@ -516,7 +483,9 @@ class IFUCube(object):
         .. [SFS] S.F. Sanchez, HII_explorer,
            http://www.caha.es/sanchez/HII_explorer/
         """
-        pass #TODO #TODO #TODO #TODO #TODO 
+        maps = get_line_map(self.data_cube, self.lamb, **kwargs)
+        cont1_map, cont2_map, filt_map, line_map = maps
+        
 
     def add_custom_bin(self, centre, r):
 
@@ -1705,15 +1674,15 @@ def get_line_map(data_cube, lamb, line_mean, filter_width=60, cont_width=60,
         The wavelengths of the datacube spectral axis.
     line_mean : float
         The central wavelength of the emission line to extract (in units of
-    ``data_cube``'s header.
-    filter_width : float
+        ``data_cube``'s header.
+    filter_width : float, optional
         The filter width to extract around the emission line.
-    cont_width : float
+    cont_width : float, optional
         The width of the wavelength window to extract either side of the filter
-    to define the continuum.
-    cont_pad :
+        to define the continuum.
+    cont_pad : float, optional
         The padding to apply between the edge of the filter and the start of
-    continuum window.
+        continuum window.
 
     Returns
     -------
@@ -1721,7 +1690,6 @@ def get_line_map(data_cube, lamb, line_mean, filter_width=60, cont_width=60,
         A length-4 list of 2D maps of the [blue continuum, red continuum,
         filter, line only (i.e. filter - continuum)], respectively.
     """
-
     # Find edges of filter and continuum windows
     low_filt = line_mean - filter_width/2.
     upp_filt = line_mean + filter_width/2.
@@ -1736,20 +1704,23 @@ def get_line_map(data_cube, lamb, line_mean, filter_width=60, cont_width=60,
     idx_upp_cont1 = np.abs(lamb - upp_cont1).argmin() + 1
     idx_low_cont2 = np.abs(lamb - low_cont2).argmin()
     idx_upp_cont2 = np.abs(lamb - upp_cont2).argmin() + 1
-
-    # Make maps of the three wavelength windows by averaging
-    # over the spectral axis
-    filter_map = np.average(data_cube.data[idx_low_filt:idx_upp_filt, :, :],
-                          axis=0)
-    cont1_map = np.average(data_cube.data[idx_low_cont1:idx_upp_cont1, :, :],
-                          axis=0)
-    cont2_map = np.average(data_cube.data[idx_low_cont2:idx_upp_cont2, :, :],
-                          axis=0)
-
+    # Get widths of the windows in order to normalise the 
+    # continuum to the filter
+    filt_width = idx_upp_filt - idx_low_filt
+    cont1_width = idx_upp_cont1 - idx_low_cont1
+    cont2_width = idx_upp_cont2 - idx_low_cont2
+    # Make maps of the three wavelength windows by averaging over the spectral
+    # axis
+    filter_map = np.sum(data_cube.data[idx_low_filt:idx_upp_filt, :, :],
+                        axis=0)
+    cont1_map = np.sum(data_cube.data[idx_low_cont1:idx_upp_cont1, :, :],
+                       axis=0) * (filt_width/cont1_width)
+    cont2_map = np.sum(data_cube.data[idx_low_cont2:idx_upp_cont2, :, :],
+                       axis=0) * (filt_width/cont2_width)
     # Determine the mean wavelength of the continuum windows
     cont1_mean = np.average((low_cont1, upp_cont1))
     cont2_mean = np.average((low_cont2, upp_cont2))
-    # Interpolate their values to estimate continuum at line
+    # Interpolate their values to estimate continuum at line mean
     cont_interp = interp1d([cont1_mean, cont2_mean], [cont1_map, cont2_map],
                            axis=0)
     cont_at_line_mean = cont_interp(line_mean)
