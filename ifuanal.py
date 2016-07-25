@@ -797,7 +797,7 @@ class IFUCube(object):
                 f.write("{:>5} {} {}\n".format(bn, of, sf))
 
 
-    def parse_results(self, clobber=False):
+    def parse_results(self, bin_num=None, clobber=False):
         """
         Creates and pickles a dictionary containing all results.
 
@@ -817,20 +817,29 @@ class IFUCube(object):
         if self.results is not None and not clobber:
             print("`results` dict exists, use clobber=True to overwrite")
             return
-
         try:
             self.vor_output
         except AttributeError:
             raise("no voronoi output found. run voronoi_bin() first")
+        if bin_num is None:
+            bin_num = self.bin_nums
+        elif bin_num not in self.bin_nums:
+            ValueError("Bin number {} does not exist".format(bin_num))
+        elif isinstance(bin_num, (int,float)):
+            bin_num = [bin_num]
 
+        tmp_dir = os.path.dirname(self.sl_output[bin_num[0]][0])
+        if not os.path.isdir(tmp_dir):
+            print("{} does not exist, cannot parse results.".format(tmp_dir))
+            return
 
         self.results = {}
         self.results["nucelus"] = self.nucleus
 
-        # Populate all bin entries in advance
-        self.results["bin"] = dict.fromkeys(self.bin_nums)
-        n_bins = len(self.bin_nums)
-        for i, bn in enumerate(self.bin_nums, 1):
+        # Populate bin entries in advance
+        self.results["bin"] = dict.fromkeys(bin_num)
+        n_bins = len(bin_num)
+        for i, bn in enumerate(bin_num, 1):
             print("parsing starlight output {}/{}\r".format(i, n_bins)),
             sys.stdout.flush()
             spaxels_idx = self.vor_output[:,3] == bn
@@ -872,7 +881,7 @@ class IFUCube(object):
                 self.bin_nums = np.delete(self.bin_nums,
                                           np.argwhere(self.bin_nums == bn))     
 
-    def plot_starlight_results(self, bin_num):
+    def plot_continuum(self, bin_num):
         """
         Plot the spectrum and results of starlight continuum fitting for
         ``bin_num``
@@ -882,7 +891,6 @@ class IFUCube(object):
         res = self.results["bin"][bin_num]
 
         # Get the data we want to plot:
-        #  for the spectral fit
         lamb = res["sl_spec"][:,0]
         obs = np.ma.masked_array(res["sl_spec"][:,1], 
                                  mask=res["sl_spec"][:,1] < 0)
@@ -890,9 +898,10 @@ class IFUCube(object):
         resid = obs - syn
         err = np.ma.masked_array(1/res["sl_spec"][:,3], 
                                  mask=res["sl_spec"][:,3] < 0)
-        masked = np.ma.masked_array(resid, mask=res["sl_spec"][:,3] != 0)
+        masked = np.ma.masked_array(resid, mask=res["sl_spec"][:,3] == 0)
+        slice_idxs = [(s.start,s.stop-1) for s in np.ma.clump_masked(masked)]
         clipped = np.ma.masked_array(resid, mask=res["sl_spec"][:,3] > -1)
-        #  and for mass and light fractions
+
         b = res["bases"]
         Z = np.sort(np.unique(b[:,5]))
         zages = []
@@ -913,14 +922,20 @@ class IFUCube(object):
         axol.plot(lamb, obs, c=OBSCOL, ls="-", lw=1, label="observed")
         axol.plot(lamb, syn, c=SYNTHCOL, ls="--", lw=1, label="starlight fit")
         axol.plot(lamb, err, c=ERRCOL, ls="-", lw=1, label="error")
+        for idx in slice_idxs:
+            axol.axvspan(self.lamb[idx[0]], self.lamb[idx[1]], color=MASKCOL,
+                         alpha=0.3)
         axol.set_ylabel("F$_\\lambda$ [normalised]")
         axol.set_ylim(0,2.2)
         plt.setp(axol.get_xticklabels(), visible=False) # we share the x axis
 
         axresid = slfig.add_subplot(gs[3,0], sharex=axol)
         axresid.plot(lamb, resid, c=OBSCOL, ls="-", lw=1, label="residual")
-        axresid.plot(lamb, masked, c=MASKCOL, ls="-", lw=1, label="masked")
+        #axresid.plot(lamb, masked, c=MASKCOL, ls="-", lw=1, label="masked")
         axresid.plot(lamb, clipped, c=CLIPPEDCOL, ls="-", lw=1, label="clipped")
+        for idx in slice_idxs:
+            axresid.axvspan(self.lamb[idx[0]], self.lamb[idx[1]], color=MASKCOL,
+                         alpha=0.3)
         axresid.set_xlim(np.min(lamb),np.max(lamb))
         axresid.set_xlabel("Wavelength "
                            "[{}]".format(self.lamb_units.to_string()))
