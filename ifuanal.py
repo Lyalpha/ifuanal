@@ -77,14 +77,11 @@ class IFUCube(object):
         The base name to be used for all output.
     RV : float, optional
         The RV value to use for the CCM extinction law.
-    vor_sn : float, optional
-        The target signal-to-noise of the voronoi binning algorithm.
     sl_dir : None or str, optional
         The directory containing starlight files and bases. The default
         ``None`` will use the `starlight/` subdirectory.
     """
-    def __init__(self, data_cube, stddev_cube, base_name, RV=3.1, vor_sn=20,
-                 sl_dir=None):
+    def __init__(self, data_cube, stddev_cube, base_name, RV=3.1, sl_dir=None):
 
         self.data_cube = data_cube
         self.stddev_cube = stddev_cube
@@ -103,8 +100,6 @@ class IFUCube(object):
         self.lamb = sl + (np.arange(self.data_shape[0]) - (rl - 1)) * dl
         self.delta_lamb = dl
         self.lamb_units = u.Unit(data_cube.header["CUNIT3"])
-
-        self.vor_sn = vor_sn # desired S/N of voronoi bins
 
         if sl_dir is None:
             self.sl_dir = os.path.join(FILEDIR, "starlight")
@@ -299,16 +294,17 @@ class IFUCube(object):
             plt.savefig(self.base_name+"_nucleus.pdf", bbox_inches="tight")
        
 
-    def voronoi_bin(self, lamb_low=5590., lamb_upp=5680., cont_lamb_low=None,
-                    cont_lamb_upp=None, clobber=False, min_sn=3):
+    def voronoi_bin(self, target_sn, lamb_low=5590., lamb_upp=5680.,
+                    cont_lamb_low=None, cont_lamb_upp=None, clobber=False,
+                    min_sn=3):
         """
         Apply the voronoi binning algorithm to the data cube.
 
-        The target signal-to-noise (S/N) is given by the class attribute
-        ``vor_sn``. S/N calculation is performed in the wavelength window given
-        by ``lamb_low`` and ``lamb_upp``. Only spaxels that have S/N >=
-        ``min_sn`` will be considered for binning. This will write results in a
-        file with the suffix `_voronoibins.txt`.
+        The target signal-to-noise (S/N) is given by ``target_sn``. S/N
+        calculation is performed in the wavelength window given by ``lamb_low``
+        and ``lamb_upp``. Only spaxels that have S/N >= ``min_sn`` will be
+        considered for binning. This will write results in a file with the
+        suffix `_voronoibins.txt`.
 
         Emission line signal to noise can be calculated by specifying
         ``cont_lamb_low`` and ``cont_lamb_upp``. In this case the S/N in this
@@ -317,6 +313,8 @@ class IFUCube(object):
 
         Parameters
         ----------
+        target_sn : float, optional
+            The target signal-to-noise of the voronoi binning algorithm.
         lamb_low, lamb_upp : float, optional
             The wavelength limits over which to calculate the S/N.
         cont_lamb_low, cont_lamb_upp : float or None optional
@@ -347,7 +345,7 @@ class IFUCube(object):
            MNRAS, 2003.
 
         """
-        print("voronoi_binning with S/N target of {}".format(self.vor_sn))
+        print("voronoi_binning with S/N target of {}".format(target_sn))
         vor_output_file = self.base_name+"_voronoibins.txt"
 
         if clobber is False:
@@ -413,8 +411,8 @@ class IFUCube(object):
         x, y, sig, noi = vor_input[:, [0,1,2,3]].T
 
         # Call the voronoi binning script
-        vor_plot = self.base_name + "_voronoibins.pdf"
-        res  = voronoi.voronoi_2d_binning(x, y, sig, noi, targetSN=self.vor_sn,
+        vor_plot = self.base_name + "_bins_voronoi.pdf"
+        res  = voronoi.voronoi_2d_binning(x, y, sig, noi, targetSN=target_sn,
                                           cvt=True, pixelsize=1, plot=vor_plot,
                                           quiet=False, n_cpu=self.n_cpu)
         bin_num, x_node, y_node, x_bar, y_bar, bin_sn, n_pix, scale = res
@@ -842,7 +840,7 @@ class IFUCube(object):
             basefiles = [os.path.join(d, f) for f in os.listdir(d)]
             Nbasefiles = len(basefiles)
             for i, basefile in enumerate(basefiles,1):
-                print("resampling base files {:>4}/{:4}\r".format(i, 
+                print("resampling base files {:>4}/{:4}\r".format(i,
                                                                  Nbasefiles)),
                 sys.stdout.flush()
                 resample_base(basefile, self.lamb, self.delta_lamb)
@@ -1323,7 +1321,7 @@ class IFUCube(object):
         # in param_uncerts - not general!!!!
         desname = {"_0":0,"_1":3,"_2":4,"_3":5,"_4":8,"_5":9,"_6":10,"_7":11}
         for i,bn in enumerate(bin_num,1):
-            print("getting emission line fluxes {:>5}/{:5}\r".format(i, 
+            print("getting emission line fluxes {:>5}/{:5}\r".format(i,
                                                                      n_bins)),
             sys.stdout.flush()
             ew = []
@@ -1350,7 +1348,7 @@ class IFUCube(object):
                 submodel = emline_model[submodel_name]
                 _ew = (2*math.pi)**0.5 * submodel.stddev * submodel.amplitude
                 # Uncertainty formula from LG IDL
-                _ew_uncert = ((2*math.pi)**0.5 
+                _ew_uncert = ((2*math.pi)**0.5
                               * ((stddev_uncert * submodel.amplitude)**2
                                  + (submodel.stddev * amp_uncert)**2)**0.5) 
                 ew.append(_ew)
@@ -1651,8 +1649,6 @@ class MUSECube(IFUCube):
         grab the value based on [SF11]_.
     RV : float, optional
         The RV value to use for the CCM extinction law.
-    vor_sn : float, optional
-        The target signal-to-noise of the voronoi binning algorithm.
     sl_dir : None or str, optional
         The directory containing starlight files and bases. The default
         ``None`` will use the `starlight/` subdirectory.
@@ -1664,8 +1660,7 @@ class MUSECube(IFUCube):
        Digital Sky Survey Stellar Spectra and Recalibrating SFD", ApJ, 2011
 
     """
-    def __init__(self, muse_cube, redshift, ebv="IRSA", RV=3.1, vor_sn=20,
-                 sl_dir=None):
+    def __init__(self, muse_cube, redshift, ebv="IRSA", RV=3.1, sl_dir=None):
         cube_hdu = fits.open(muse_cube)
         base_name = os.path.splitext(muse_cube)[0]
         if base_name.endswith(".fits"):
@@ -1688,7 +1683,7 @@ class MUSECube(IFUCube):
         data_cube.header["IFU_Z"] = float(redshift)
 
         super(MUSECube, self).__init__(data_cube, stddev_cube, base_name, RV,
-                                       vor_sn, sl_dir)
+                                       sl_dir)
 
 
 def get_IRSA_ebv(header):
