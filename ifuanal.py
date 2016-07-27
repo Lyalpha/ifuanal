@@ -9,7 +9,7 @@ __author__ = "J. Lyman"
 
 from itertools import repeat, cycle, product
 import json
-from math import log10, pi
+import math
 import os
 import re
 import tempfile
@@ -30,6 +30,7 @@ from matplotlib import gridspec, ticker, cm, colors, rc
 from mpl_toolkits.axes_grid1 import AxesGrid
 import numpy as np
 from scipy.interpolate import interp1d
+from scipy import ndimage
 
 from voronoi import voronoi
 import dill as pickle
@@ -434,7 +435,8 @@ class IFUCube(object):
 
 
     def emission_line_bin(self, min_peak_flux, min_frac_flux, max_radius,
-                          min_flux, plot=True, **kwargs):
+                          min_flux, line_lamb=6562.8, plot=True, clobber=False,
+                          **kwargs):
         """
         Apply the HII explorer [SFS]_ binning algorithm to the datacube.
 
@@ -460,15 +462,17 @@ class IFUCube(object):
             The minimum flux of a spaxel, as a fraction of the bin's peak flux,
             to be considered a member of the bin.
         max_radius : float
-            The maximum radius (in what units?!) allowed for a bin.
+            The maximum radius (in what units?!) allowed for a bin. Any peaks
+            found within ``max_radius`` of the image edge will not be used.
         min_flux : float
             The minimum flux of a spaxel for consideration in the binning
             routine.
-        plot : bool
+        line_lamb : float, optional
+            The wavelength of the emission line to use (defaults to H$\\alpha$).
+        plot : bool, optional
             Whether to make a plot of the continuum, filter, line and bin maps.
-        line_mean : float, optional
-            The central wavelength of the emission line to extract (in units of
-            ``data_cube``'s header.
+        clobber : bool, optional
+            Whether to overwrite any existing binning results.
         filter_width : float, optional
             The filter width to extract around the emission line.
         cont_width : float, optional
@@ -483,8 +487,92 @@ class IFUCube(object):
         .. [SFS] S.F. Sanchez, HII_explorer,
            http://www.caha.es/sanchez/HII_explorer/
         """
-        maps = get_line_map(self.data_cube, self.lamb, **kwargs)
-        cont1_map, cont2_map, filt_map, line_map = maps
+        if min_flux >= min_peak_flux:
+            print "Requires ``min_peak_flux > min_flux`` for sensible results"
+            return
+        r = math.ceil(max_radius)
+
+        maps = get_line_map(self.data_cube, self.lamb, line_lamb, **kwargs)
+        filt_map, cont_map, line_map = maps
+
+        # Find peaks in the line_map, these can be quite close together
+        # as we will grow/merge them later with the HII explorer algorithm
+        line_map_max = ndimage.maximum_filter(line_map, size=3, mode="constant")
+        # Get the location of the peaks and apply the minimum peak threshhold
+        peaks = (line_map_max == line_map) & (line_map >= min_peak_flux)
+        # Remove all peaks within ``max_radius`` of the map edge
+        peaks[:r, :] = 0
+        peaks[-r:, :] = 0
+        peaks[:, :r] = 0
+        peaks[:, -r:] = 0
+        # Number of peaks
+        npeaks = len(peaks)
+        # Get locations in the map of the peaks and sort decending in flux
+        sort_idx = line_map[peaks].argsort()[::-1]
+        peak_xy = np.argwhere(peaks)[sort_idx]
+        # Keep track of which pixels are allocated to which bin
+        bin_map = np.empty(peaks.shape) * np.nan
+        # Keep a list of bin peaks (a subset of peak_xy)
+        #bin_peak_xy = peak_xy.copy().astype("float64")
+        bin_nums = {}
+        # Starting with the brightest, run the HII explorer algorithm to the
+        # map. If a peak is merged with a brighter nearby peak, it is skipped.
+        for i,xy in enumerate(peak_xy,1):
+            x,y = xy
+            # Check if we've already covered this peak
+            if ~np.isnan(bin_map[x,y]):
+                #bin_peak_xy[i-1] = np.nan
+                continue
+            peak_flux = line_map[x,y]
+            thresh_flux = max(peak_flux * min_frac_flux, min_flux)
+
+            # Make cutouts around our peak to check:
+            # - the distance of the spaxels
+            x_cen = np.arange(-math.ceil(r),math.ceil(r)+1,1)
+            y_cen = np.arange(-math.ceil(r),math.ceil(r)+1,1)
+            xx,yy = np.meshgrid(x_cen,y_cen)
+            dists = np.sqrt(xx * xx + yy * yy)
+            # - the flux of the spaxels
+            fluxes = line_map[x-r:x+r+1, y-r:y+r+1]
+            # - if the spaxels have been preiously assigned a bin
+            allocs = bin_map[x-r:x+r+1, y-r:y+r+1]
+
+            # If the spaxel passes these tests it is added to the bin
+            bin_cutout = (dists <= max_radius) \
+                         & (fluxes >= thresh_flux) \
+                         & (np.isnan(allocs))
+            # Update the bin_map with this bin number
+            bin_map[x-r:x+r+1, y-r:y+r+1][bin_cutout] = i
+            # Add a bin entry to our dict if needed
+            if np.sum(bin_cutout) > 0:
+                # We swap the x and y to FITS standard in the dict
+                bin_nums[i] = {"spax":np.where(bin_map == i)[::-1],
+                               "peak":(x,y)[::-1]}
+
+        # Remove all our nans from the bin peak coordinates
+        #bin_peak_xy = bin_peak_xy[~np.isnan(bin_peak_xy).any(axis=1)]
+
+        if plot:
+            plt.close()
+            binfig, ax = plt.subplots(1,4, sharex=True, sharey=True,
+                                      figsize=(16,4),
+                                      subplot_kw={"adjustable":"box-forced"})
+            ax[0].imshow(np.sqrt(filt_map), origin="lower",
+                         interpolation="none")
+            ax[0].set_title("Filter")
+            ax[1].imshow(np.sqrt(cont_map), origin="lower",
+                         interpolation="none")
+            ax[1].set_title("Continuum")
+            ax[2].imshow(np.sqrt(line_map), origin="lower",
+                         interpolation="none")
+            ax[2].set_title("Line")
+            ax[3].imshow(bin_map, origin="lower", interpolation="none",
+                         cmap="viridis_r")
+            ax[3].set_title("Bins")
+            binfig.suptitle("Filter centre at {}\\AA".format(line_lamb))
+            binfig.savefig(self.base_name+"_bins_el.pdf", bbox_inches="tight")
+
+        self.bin_nums = bin_nums
         
 
     def add_custom_bin(self, centre, r):
@@ -530,7 +618,6 @@ class IFUCube(object):
             if not np.any(self.vor_output[:,3] == bin_num):
                 break
             bin_num -= 1
-            continue
         vor_append[:,3] = bin_num
         self.bin_nums = np.append(self.bin_nums, bin_num)
         density = vor_append[:,2]**2
@@ -755,7 +842,8 @@ class IFUCube(object):
             basefiles = [os.path.join(d, f) for f in os.listdir(d)]
             Nbasefiles = len(basefiles)
             for i, basefile in enumerate(basefiles,1):
-                print("resampling base files {}/{}\r".format(i, Nbasefiles)),
+                print("resampling base files {:>4}/{:4}\r".format(i, 
+                                                                 Nbasefiles)),
                 sys.stdout.flush()
                 resample_base(basefile, self.lamb, self.delta_lamb)
         print
@@ -840,7 +928,7 @@ class IFUCube(object):
         self.results["bin"] = dict.fromkeys(bin_num)
         n_bins = len(bin_num)
         for i, bn in enumerate(bin_num, 1):
-            print("parsing starlight output {}/{}\r".format(i, n_bins)),
+            print("parsing starlight output {:5}/{:5}\r".format(i, n_bins)),
             sys.stdout.flush()
             spaxels_idx = self.vor_output[:,3] == bn
             if self.sl_output[bn][0] is not None:
@@ -1235,7 +1323,8 @@ class IFUCube(object):
         # in param_uncerts - not general!!!!
         desname = {"_0":0,"_1":3,"_2":4,"_3":5,"_4":8,"_5":9,"_6":10,"_7":11}
         for i,bn in enumerate(bin_num,1):
-            print("getting emission line fluxes {}/{}\r".format(i, n_bins)),
+            print("getting emission line fluxes {:>5}/{:5}\r".format(i, 
+                                                                     n_bins)),
             sys.stdout.flush()
             ew = []
             ew_uncert = []
@@ -1259,9 +1348,9 @@ class IFUCube(object):
                              param_uncerts[desname[submodel_name[-2:]]]
                 #FIXME needs generalising!!!
                 submodel = emline_model[submodel_name]
-                _ew = (2*pi)**0.5 * submodel.stddev * submodel.amplitude
+                _ew = (2*math.pi)**0.5 * submodel.stddev * submodel.amplitude
                 # Uncertainty formula from LG IDL
-                _ew_uncert = ((2*pi)**0.5 
+                _ew_uncert = ((2*math.pi)**0.5 
                               * ((stddev_uncert * submodel.amplitude)**2
                                  + (submodel.stddev * amp_uncert)**2)**0.5) 
                 ew.append(_ew)
@@ -1300,7 +1389,7 @@ class IFUCube(object):
         # [OIII]4959, [OIII]5007
         n_bins = len(bin_num)
         for i,bn in enumerate(bin_num,1):
-            print("getting emission line metallicities {}/{}\r".format(i,
+            print("getting emission line metallicities {:>5}/{:5}\r".format(i,
                                                                        n_bins)),
             sys.stdout.flush()
             bin_res = self.results["bin"][bn]
@@ -1670,7 +1759,7 @@ def get_Alamb(lamb, ebv, RV=3.1, lamb_unit=u.Unit("angstrom")):
     return Alamb
 
 
-def get_line_map(data_cube, lamb, line_mean, filter_width=60, cont_width=60,
+def get_line_map(data_cube, lamb, line_lamb, filter_width=60, cont_width=60,
                  cont_pad=30):
     """
     Calculates a 2D continuum-subtracted emission line map.
@@ -1687,7 +1776,7 @@ def get_line_map(data_cube, lamb, line_mean, filter_width=60, cont_width=60,
         The data cube extension from which to extract the segmentation map.
     lamb : array-like
         The wavelengths of the datacube spectral axis.
-    line_mean : float
+    line_lamb : float
         The central wavelength of the emission line to extract (in units of
         ``data_cube``'s header.
     filter_width : float, optional
@@ -1702,12 +1791,12 @@ def get_line_map(data_cube, lamb, line_mean, filter_width=60, cont_width=60,
     Returns
     -------
     2d_maps : list
-        A length-4 list of 2D maps of the [blue continuum, red continuum,
-        filter, line only (i.e. filter - continuum)], respectively.
+        A length-3 list of 2D maps of the [filter (line+continuum), continuum,
+        line only], respectively.
     """
     # Find edges of filter and continuum windows
-    low_filt = line_mean - filter_width/2.
-    upp_filt = line_mean + filter_width/2.
+    low_filt = line_lamb - filter_width/2.
+    upp_filt = line_lamb + filter_width/2.
     low_cont1 = low_filt - cont_pad - cont_width
     upp_cont1 = low_filt - cont_pad
     low_cont2 = upp_filt + cont_pad
@@ -1721,9 +1810,9 @@ def get_line_map(data_cube, lamb, line_mean, filter_width=60, cont_width=60,
     idx_upp_cont2 = np.abs(lamb - upp_cont2).argmin() + 1
     # Get widths of the windows in order to normalise the 
     # continuum to the filter
-    filt_width = idx_upp_filt - idx_low_filt
-    cont1_width = idx_upp_cont1 - idx_low_cont1
-    cont2_width = idx_upp_cont2 - idx_low_cont2
+    filt_width = float(idx_upp_filt - idx_low_filt)
+    cont1_width = float(idx_upp_cont1 - idx_low_cont1)
+    cont2_width = float(idx_upp_cont2 - idx_low_cont2)
     # Make maps of the three wavelength windows by averaging over the spectral
     # axis
     filter_map = np.sum(data_cube.data[idx_low_filt:idx_upp_filt, :, :],
@@ -1738,11 +1827,11 @@ def get_line_map(data_cube, lamb, line_mean, filter_width=60, cont_width=60,
     # Interpolate their values to estimate continuum at line mean
     cont_interp = interp1d([cont1_mean, cont2_mean], [cont1_map, cont2_map],
                            axis=0)
-    cont_at_line_mean = cont_interp(line_mean)
+    cont_map = cont_interp(line_lamb)
     # Subtract this continuum
-    line_map = filter_map - cont_at_line_mean
+    line_map = filter_map - cont_map
 
-    return [cont1_map, cont2_map, filter_map, line_map]
+    return [filter_map, cont_map, line_map]
 
 
 
