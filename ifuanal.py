@@ -345,23 +345,17 @@ class IFUCube(object):
            MNRAS, 2003.
 
         """
-        print("voronoi_binning with S/N target of {}".format(target_sn))
-        vor_output_file = self.base_name+"_voronoibins.txt"
+        try:
+            self.bin_nums
+        except AttributeError:
+            pass
+        else:
+            if not clobber:
+                raise AttributeError("``bin_nums`` already exists, use clobber"
+                                     " to overwrite")
 
-        if clobber is False:
-            # Search for an existing output
-            try:
-                vor_output = np.genfromtxt(vor_output_file)
-            except IOError, ValueError:
-                print("no valid voronoi binning file found")
-            else:
-                # Set attributes based on the existing file
-                self.bin_nums = np.sort(np.unique(vor_output[:,3]))\
-                                  .astype("int")
-                self.x_bar, self.y_bar = vor_output[:,5], vor_output[:,6]
-                self.bin_sn = vor_output[:,4]
-                self.vor_output = vor_output
-                return
+        print("Binning spaxels with Voronoi algorithm with "
+              "S/N target of {}".format(target_sn))
 
         if not all((self.lamb[0] < lamb_low < self.lamb[-1], 
                     self.lamb[0] < lamb_upp < self.lamb[-1])):
@@ -417,19 +411,19 @@ class IFUCube(object):
                                           quiet=False, n_cpu=self.n_cpu)
         bin_num, x_node, y_node, x_bar, y_bar, bin_sn, n_pix, scale = res
 
-        # Save the output of voronoi binning
-        vor_output = np.column_stack([x, y, sig/noi, bin_num, bin_sn[bin_num],
-                                      x_bar[bin_num], y_bar[bin_num]])
-        with open(vor_output_file, "wb") as f:
-            f.write(b"#  x    y  sn_spec bin_num   sn_bin bin_xbar bin_ybar\n")
-            np.savetxt(f, vor_output, 
-                       fmt=b"%4i %4i %8.3f %7i %8.3f %8.3f %8.3f")
-
-        # Some class attributes to assign
-        self.bin_nums = np.sort(np.unique(bin_num)).astype("int")
-        self.x_bar, self.y_bar = x_bar, y_bar
-        self.bin_sn = bin_sn
-        self.vor_output = vor_output
+        # Save the output of voronoi binning (this is a relic)
+        #vor_output = np.column_stack([x, y, sig/noi, bin_num, bin_sn[bin_num],
+        #                              x_bar[bin_num], y_bar[bin_num]])
+        vor_output = np.column_stack([x, y, x_bar[bin_num], y_bar[bin_num],
+                                      bin_num])
+        # Populate the bin_nums dict
+        bin_nums = {}
+        for bn in np.sort(np.unique(bin_num)).astype("int"):
+            idx = vor_output[:,4] == bn
+            x, y, x_bar, y_bar, _bn = vor_output[idx].T
+            bin_nums[bn] = {"spax":(x.astype("int"), y.astype("int")),
+                            "mean":(x_bar, y_bar)}
+        self.bin_nums = bin_nums
 
 
     def emission_line_bin(self, min_peak_flux, min_frac_flux, max_radius,
@@ -485,9 +479,22 @@ class IFUCube(object):
         .. [SFS] S.F. Sanchez, HII_explorer,
            http://www.caha.es/sanchez/HII_explorer/
         """
+        try:
+            self.bin_nums
+        except AttributeError:
+            pass
+        else:
+            if not clobber:
+                raise AttributeError("``bin_nums`` already exists, use clobber"
+                                     " to overwrite")
+
         if min_flux >= min_peak_flux:
-            print "Requires ``min_peak_flux > min_flux`` for sensible results"
+            print "``min_peak_flux > min_flux`` is required"
             return
+
+        print("Binning spaxels using HII explorer algorithm around emission "
+              "line {}".format(line_lamb))
+
         r = math.ceil(max_radius)
 
         maps = get_line_map(self.data_cube, self.lamb, line_lamb, **kwargs)
@@ -515,7 +522,7 @@ class IFUCube(object):
         bin_nums = {}
         # Starting with the brightest, run the HII explorer algorithm to the
         # map. If a peak is merged with a brighter nearby peak, it is skipped.
-        for i,xy in enumerate(peak_xy,1):
+        for i, xy in enumerate(peak_xy):
             x,y = xy
             # Check if we've already covered this peak
             if ~np.isnan(bin_map[x,y]):
@@ -545,8 +552,8 @@ class IFUCube(object):
             if np.sum(bin_cutout) > 0:
                 # We swap the x and y to FITS standard in the dict
                 bin_nums[i] = {"spax":np.where(bin_map == i)[::-1],
-                               "peak":(x,y)[::-1]}
-
+                               "mean":(x,y)[::-1]}
+        self.bin_nums = bin_nums
         # Remove all our nans from the bin peak coordinates
         #bin_peak_xy = bin_peak_xy[~np.isnan(bin_peak_xy).any(axis=1)]
 
@@ -570,7 +577,7 @@ class IFUCube(object):
             binfig.suptitle("Filter centre at {}\\AA".format(line_lamb))
             binfig.savefig(self.base_name+"_bins_el.pdf", bbox_inches="tight")
 
-        self.bin_nums = bin_nums
+
         
 
     def add_custom_bin(self, centre, r):
@@ -602,31 +609,18 @@ class IFUCube(object):
                         -x_cen:self.data_shape[2]-x_cen]
         dataidx = np.where(x*x + y*y <= r*r)
 
-        voridx = np.zeros(len(dataidx[0]), dtype="int")
-        for i,di in enumerate(zip(dataidx[0], dataidx[1])):
-            voridx[i] = np.where((self.vor_output[:,:2] == di)\
-                                 .all(axis=1))[0][0]
-
-        # Make a new row of data that we will append to the existing
-        # output from the voronoi binning
-        vor_append = self.vor_output[voridx]
-        vor_append[:,4] = -999
-        bin_num = -1
+        bn = -1
+        existing_bins = self._get_bin_nums()
         while True:
-            if not np.any(self.vor_output[:,3] == bin_num):
+            if bn not in existing_bins:
                 break
-            bin_num -= 1
-        vor_append[:,3] = bin_num
-        self.bin_nums = np.append(self.bin_nums, bin_num)
-        density = vor_append[:,2]**2
-        mass = np.sum(density)
-        vor_append[:,5] = np.sum(vor_append[:,0]*density)/mass
-        vor_append[:,6] = np.sum(vor_append[:,1]*density)/mass     
+            bn -= 1
 
-        self.vor_output = np.vstack((self.vor_output, vor_append))
-        print("added custom bin {} to the list".format(bin_num))
+        self.bin_nums[bn] = {"spax":(dataidx[0], dataidx[1]),
+                                  "mean":(x_cen,y_cen)[::-1]}
+        print("added custom bin {} to the list".format(bn))
 
-    def get_bin_num(self, loc):
+    def get_loc_bin(self, loc):
         """
         Return the bin number for a given location.
 
@@ -640,6 +634,8 @@ class IFUCube(object):
         bin_num : int
             The bin number that contains ``loc``. Returns None if not in any bin.
         """
+        #FIXME
+        return
         x, y = map(int, loc)
         idx = np.where((self.vor_output[:,:2] == [x,y]).all(axis=1))[0]
         if idx.size == 1:
@@ -647,6 +643,9 @@ class IFUCube(object):
         else:
             print("didn't find a bin at location {}, {}".format(x,y))
             return None
+
+    def _get_bin_nums(self):
+        return self.bin_nums.keys()
 
 
     def get_single_spectrum(self, x, y):
@@ -658,6 +657,10 @@ class IFUCube(object):
         Flag = 2 for negative or nan fluxes (dummy values for flux and flux_err
         are inserted for these wavelengths).
         """
+        if not all((len(x) == 1, len(y) == 1)):
+            raise AttributeError("``x`` and ``y`` should be length-1")
+        x = int(x)
+        y = int(y)
         spec = np.empty((self.lamb.size, 4))
         spec[:,0] = self.lamb
 
@@ -716,16 +719,12 @@ class IFUCube(object):
         each. Calls ``get_single_spectrum`` or ``get_weighted_spectrum`` as
         appropriate (i.e. if number of spaxels in bin is 1 or >1)
         """
-        try:
-            self.vor_output
-        except AttributeError:
-            raise("No voronoi output found. Run voronoi_bin() first")
 
         n_bins = len(bin_num)
         for i,bn in enumerate(bin_num,1):
             # Get the indices and number of spaxels that are in our chosen bin
-            spaxels_idx = self.vor_output[:,3] == bn
-            spaxels_num = np.sum(spaxels_idx)
+            x_spax, y_spax = self.bin_nums[bn]["spax"]
+            spaxels_num = len(x_spax)
             print("Calculating weighted mean of {:>3} spaxels in bin {:>5} "
                   "({:>5}/{:>5})\r".format(spaxels_num, bn, i, n_bins)),
             sys.stdout.flush()
@@ -734,15 +733,11 @@ class IFUCube(object):
                 raise ValueError("No spaxels found in bin number: "
                                  "{}".format(bin_num))
             elif spaxels_num == 1:
-                # Just return the single spaxel
-                x, y = self.vor_output[spaxels_idx,:2][0]
-                spec = self.get_single_spectrum(x, y)
+                # yield the single spaxel's spectrum
+                spec = self.get_single_spectrum(x_spax, y_spax)
             else:
-                # Get the x and y positions of our spaxels in the data cube
-                x = self.vor_output[spaxels_idx,0].astype("int")
-                y = self.vor_output[spaxels_idx,1].astype("int")
-                # and get the weighted spectrum of these positions
-                spec = self.get_weighted_spectrum(x,y)        
+                # yield the weighted spectrum of these positions
+                spec = self.get_weighted_spectrum(x_spax,y_spax)
             yield spec
 
 
@@ -814,9 +809,9 @@ class IFUCube(object):
             #TODO
 
         if bin_num is None:
-            bin_num = self.bin_nums
-        elif bin_num not in self.bin_nums:
-            ValueError("Bin number {} does not exist".format(bin_num))
+            bin_num = self._get_bin_nums()
+        elif bin_num not in self._get_bin_nums():
+            raise ValueError("Bin number {} does not exist".format(bin_num))
         elif isinstance(bin_num, (int,float)):
             bin_num = [bin_num]
         print("fitting {} bins...".format(len(bin_num)))
@@ -904,13 +899,13 @@ class IFUCube(object):
             print("`results` dict exists, use clobber=True to overwrite")
             return
         try:
-            self.vor_output
+            self.bin_nums
         except AttributeError:
-            raise("no voronoi output found. run voronoi_bin() first")
+            raise("``bin_nums`` not found, run a binning routine first")
         if bin_num is None:
-            bin_num = self.bin_nums
-        elif bin_num not in self.bin_nums:
-            ValueError("Bin number {} does not exist".format(bin_num))
+            bin_num = self._get_bin_nums()
+        elif bin_num not in self._get_bin_nums():
+            raise ValueError("Bin number {} does not exist".format(bin_num))
         elif isinstance(bin_num, (int,float)):
             bin_num = [bin_num]
 
@@ -928,24 +923,20 @@ class IFUCube(object):
         for i, bn in enumerate(bin_num, 1):
             print("parsing starlight output {:5}/{:5}\r".format(i, n_bins)),
             sys.stdout.flush()
-            spaxels_idx = self.vor_output[:,3] == bn
             if self.sl_output[bn][0] is not None:
                 self.results["bin"][bn] = parse_starlight(self.sl_output[bn][0])
                 if self.results["bin"][bn] is None: #i.e. failed to get Nl_Obs
-                    print("failed to find [Nl_Obs] line, or suspiciously "
-                          "few lines in {}".format(self.sl_output[bn][0]))
+                    print("Removing bin {}, failed to parse {}"
+                          .format(self.sl_output[bn][0], bn))
                     self.results["bin"].pop(bn)
-                    self.bin_nums = np.delete(self.bin_nums,
-                                              np.argwhere(self.bin_nums == bn))
+                    self.bin_nums.pop(bn)
                     continue
                 self.results["bin"][bn]["spec"] = np.genfromtxt(
                                                       self.sl_output[bn][1])
-                x_spax = self.vor_output[spaxels_idx,0].astype("int")
-                y_spax = self.vor_output[spaxels_idx,1].astype("int")
+                x_spax, y_spax = self.bin_nums[bn]["spax"]
                 self.results["bin"][bn]["x_spax"] = x_spax
                 self.results["bin"][bn]["y_spax"] = y_spax
-                x_bar = self.vor_output[spaxels_idx,5][0]
-                y_bar = self.vor_output[spaxels_idx,6][0]
+                x_bar, y_bar = self.bin_nums[bn]["mean"]
                 self.results["bin"][bn]["x_bar"] = x_bar
                 self.results["bin"][bn]["y_bar"] = y_bar
                 if self.nucleus is not None:
@@ -962,10 +953,9 @@ class IFUCube(object):
                     self.results["bin"][bn]["distance_max"] = None
                     self.results["bin"][bn]["distance_bar"] = None
             else:
-                print("no valid sl_output found for {}, removing".format(bn))
+                print("Removing bin {}, No sl_output found".format(bn))
                 self.results["bin"].pop(bn)
-                self.bin_nums = np.delete(self.bin_nums,
-                                          np.argwhere(self.bin_nums == bn))     
+                self.bin_nums.pop(bn)
 
     def plot_continuum(self, bin_num):
         """
@@ -973,7 +963,6 @@ class IFUCube(object):
         ``bin_num``
 
         """
-
         res = self.results["bin"][bin_num]
 
         # Get the data we want to plot:
@@ -1075,7 +1064,7 @@ class IFUCube(object):
         slfig.subplots_adjust(hspace=0.1)
         slfig.savefig(self.base_name+"_sl_fit_{}.png".format(bin_num),
                       bbox_inches="tight", dpi=300, additional_artists=(lgnd,))
-
+        print("plot saved to {}_sl_fit_{}.png".format(self.base_name, bin_num))
 
     def plot_worst_fits(self, N=5):
         """
@@ -1261,9 +1250,9 @@ class IFUCube(object):
         #     line positions and set any S/N < 3, say, to upper limits for
         #     purposes of Z calculations etc.
         if bin_num is None:
-            bin_num = self.bin_nums
-        elif bin_num not in self.bin_nums:
-            ValueError("bin number {} does not exist".format(bin_num))
+            bin_num = self._get_bin_nums()
+        elif bin_num not in self._get_bin_nums():
+            raise ValueError("bin number {} does not exist".format(bin_num))
         elif isinstance(bin_num, (int,float)):
             bin_num = [bin_num]
         print("fitting emission lines to {} bins...".format(len(bin_num)))
@@ -1310,9 +1299,9 @@ class IFUCube(object):
             this will fit all bins)
         """
         if bin_num is None:
-            bin_num = self.bin_nums
-        elif bin_num not in self.bin_nums:
-            ValueError("Bin number {} does not exist".format(bin_num))
+            bin_num = self._get_bin_nums()
+        elif bin_num not in self._get_bin_nums():
+            raise ValueError("Bin number {} does not exist".format(bin_num))
         elif isinstance(bin_num, (int,float)):
             bin_num = [bin_num]
 
@@ -1376,9 +1365,9 @@ class IFUCube(object):
         """
 
         if bin_num is None:
-            bin_num = self.bin_nums
-        elif bin_num not in self.bin_nums:
-            ValueError("bin number {} does not exist".format(bin_num))
+            bin_num = self._get_bin_nums()
+        elif bin_num not in self._get_bin_nums():
+            raise ValueError("bin number {} does not exist".format(bin_num))
         elif isinstance(bin_num, (int,float)):
             bin_num = [bin_num]
 
@@ -1478,6 +1467,7 @@ class IFUCube(object):
         elfig.subplots_adjust(wspace=0.1)
         elfig.savefig(self.base_name+"_el_fit_{}.png".format(bin_num),
                       bbox_inches="tight",dpi=300)
+        print("plot saved to {}_el_fit_{}.png".format(self.base_name, bin_num))
 
 
     def plot_metallicity(self, indicator="D16", Zmin=None, Zmax=None):
@@ -1497,7 +1487,6 @@ class IFUCube(object):
             Specify the limits (in :math:`12+\log(O/H)`) for the colourmap,
             otherwise the min and max metallicities will be the bounds.
         """
-        print "metallicity_plot()"
 
         valid_indicators = ["PP04_N2", "PP04_O3N2", "M13", "D16"]
         if indicator not in valid_indicators:
@@ -1518,6 +1507,8 @@ class IFUCube(object):
 
         plt.savefig(self.base_name+"_metallicity_{}.pdf".format(indicator),
                     bbox_inches="tight")
+        print("plot saved to {}_metallicity_{}.pdf".format(self.base_name,
+                                                      indicator))
 
     def make_emission_line_cube(self, clobber=False):
         """
@@ -1556,6 +1547,8 @@ class IFUCube(object):
                                      header=self.stddev_cube.header))
         hdulist.writeto(outfile, clobber=clobber)
 
+        print("Emission line cube saved to {}".format(outfile))
+
     def make_continuum_cube(self):
         """
         Subtract the emission line model from each bin to produce a continuum
@@ -1564,6 +1557,7 @@ class IFUCube(object):
         To be implemented.
         """
         pass
+        #print("Continuum cube saved to {}".format(outfile))
 
     @classmethod
     def load_pkl(self, pkl_file):
@@ -2026,7 +2020,7 @@ def parse_starlight(sl_output):
     try:
         lines = open(sl_output).readlines()
     except IOError:
-        print "cannot read {}!".format(sl_output)
+        print "cannot open {}!".format(sl_output)
         return None
     n_lines = len(lines)
     if n_lines < 20:
