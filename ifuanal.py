@@ -614,8 +614,8 @@ class IFUCube(object):
                 break
             bn -= 1
 
-        self.bin_nums[bn] = {"spax":(dataidx[0], dataidx[1]),
-                                  "mean":(x_cen,y_cen)[::-1]}
+        self.bin_nums[bn] = {"spax":(dataidx[1], dataidx[0]),
+                                  "mean":(x_cen,y_cen)}
         print("added custom bin {} to the list".format(bn))
 
     def get_loc_bin(self, loc):
