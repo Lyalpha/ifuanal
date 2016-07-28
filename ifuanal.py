@@ -517,12 +517,11 @@ class IFUCube(object):
         peak_xy = np.argwhere(peaks)[sort_idx]
         # Keep track of which pixels are allocated to which bin
         bin_map = np.empty(peaks.shape) * np.nan
-        # Keep a list of bin peaks (a subset of peak_xy)
-        #bin_peak_xy = peak_xy.copy().astype("float64")
         bin_nums = {}
+        b = 0 # ensure we have contiguous sequence of bin_numbers
         # Starting with the brightest, run the HII explorer algorithm to the
         # map. If a peak is merged with a brighter nearby peak, it is skipped.
-        for i, xy in enumerate(peak_xy):
+        for xy in peak_xy:
             x,y = xy
             # Check if we've already covered this peak
             if ~np.isnan(bin_map[x,y]):
@@ -546,16 +545,15 @@ class IFUCube(object):
             bin_cutout = (dists <= max_radius) \
                          & (fluxes >= thresh_flux) \
                          & (np.isnan(allocs))
-            # Update the bin_map with this bin number
-            bin_map[x-r:x+r+1, y-r:y+r+1][bin_cutout] = i
-            # Add a bin entry to our dict if needed
             if np.sum(bin_cutout) > 0:
-                # We swap the x and y to FITS standard in the dict
-                bin_nums[i] = {"spax":np.where(bin_map == i)[::-1],
+                # Update the bin_map with this bin number
+                bin_map[x-r:x+r+1, y-r:y+r+1][bin_cutout] = b
+                # Add a bin entry to our dict
+                bin_nums[b] = {"spax":np.where(bin_map == b)[::-1],
                                "mean":(x,y)[::-1]}
+                # We swap the x and y to FITS standard in the dict
+                b += 1 # update bin number
         self.bin_nums = bin_nums
-        # Remove all our nans from the bin peak coordinates
-        #bin_peak_xy = bin_peak_xy[~np.isnan(bin_peak_xy).any(axis=1)]
 
         if plot:
             plt.close()
