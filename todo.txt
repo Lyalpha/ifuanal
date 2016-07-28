@@ -1,5 +1,9 @@
 #TODOs
 
+#TODO    : bin_nums and results should be merged. Also, parse_results and then
+#          emissionline fitting doesn't flow well. Just parse results for
+#          starlight within run_starlight and do away with all sl_output etc.?
+
 #TODO    : generalise the emission line model to any emission_line.json input.
 #          add numbering to components in emission_lines.json with Halpha 0 and
 #          NII 1, then split by balmer and forbidden?  When constructing
