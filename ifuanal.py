@@ -925,7 +925,7 @@ class IFUCube(object):
                 self.results["bin"][bn] = parse_starlight(self.sl_output[bn][0])
                 if self.results["bin"][bn] is None: #i.e. failed to get Nl_Obs
                     print("Removing bin {}, failed to parse {}"
-                          .format(self.sl_output[bn][0], bn))
+                          .format(bn, self.sl_output[bn][0]))
                     self.results["bin"].pop(bn)
                     self.bin_nums.pop(bn)
                     continue
