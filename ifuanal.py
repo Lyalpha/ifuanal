@@ -1468,7 +1468,7 @@ class IFUCube(object):
         print("plot saved to {}_el_fit_{}.png".format(self.base_name, bin_num))
 
 
-    def plot_metallicity(self, indicator="D16", Zmin=None, Zmax=None):
+    def plot_metallicity(self, indicator="D16", zmin=None, zmax=None):
         """
         Plot the metallicity of the host.
 
@@ -1481,7 +1481,7 @@ class IFUCube(object):
         indicator: str
             The metallicity indicator to plot, current options are "PP04_N2",
             "PP04_O3N2", "M13", "D16".
-        Zmin, Zmax: float, optional
+        zmin, zmax: float, optional
             Specify the limits (in :math:`12+\log(O/H)`) for the colourmap,
             otherwise the min and max metallicities will be the bounds.
         """
@@ -1497,8 +1497,8 @@ class IFUCube(object):
             Z[r["y_spax"],r["x_spax"]] = r["metallicity"][indicator]
 
         plt.close("all")
-        plt.imshow(Z, origin="lower", interpolation="none", vmin=vmin,
-                   vmax=vmax)
+        plt.imshow(Z, origin="lower", interpolation="none", vmin=zmin,
+                   vmax=zmax)
         plt.colorbar(label="$Z$ [$12 + \log_{10}(\\textrm{O}/\\textrm{H})$]",
                      orientation="horizontal").ax.tick_params(labelsize=16)
         plt.plot(self.nucleus[0], self.nucleus[1], "kx", markersize=10)
