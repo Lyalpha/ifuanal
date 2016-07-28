@@ -157,46 +157,99 @@ and residual for checking (``plot=False`` to skip this).
 Binning the spaxels
 -------------------
 
+We do not want to consider sky spaxels in our analysis and, additionally, we do
+not want to perform fitting to low signal-to-noise ratio (SNR) spaxels. To
+circumvent this we employ spaxel binning.
+
+The spaxels are to be binned into distinct regions in order to increase the S/N
+of the composite region spectra for fitting. :ref:`vor-binning` and
+:ref:`hii-binning` are the two currently implemented methods, with the ability
+to also :ref:`add custom bins <custom-bins>`.
+
+These binning routines will populate an attribute of :class:`~ifuanal.IFUCube`
+named :attr:`bin_nums`. Once a binning routine has been performed, this will
+appear as a ``dict`` of the form: ::
+
+  >>> cube.bin_nums
+  {0: {'mean': (x_mean, y_mean),
+  'spax': (x_spax, y_spax)},
+   1 ...
+  }
+
+The entry ``mean`` gives the centre of the bin (for Vornoi binning this is the
+centre of mass, for the HII region binning, this is the peak). ``spax`` gives
+the spatial indices of the datacube belonging to that bin. e.g. ::
+
+  >>> cube.bin_nums[100]["spax"] # get the x and y coordinates of bin 100
+
+.. Note::
+
+   To repeat or redo binning once :attr:`bin_nums` is populated, pass the
+   argument ``clobber= True`` in the binning method's call.
+
+.. _vor-binning:
+
 Voronoi binning
 ^^^^^^^^^^^^^^^
 
-We do not want to consider sky spaxels in our analysis and, additionally, we do
-not want to perform fitting to low signal-to-noise ratio (SNR) spaxels. To
-circumvent this we remove spaxels with low SNR (<3) and employ a binning routine
-based on `Voronoi tessellation <https://en.wikipedia.org/wiki/Voronoi_diagram>`_
-using the `Voronoi binning algorithm
-<http://www-astro.physics.ox.ac.uk/~mxc/software/>`_ to produce bins from the
-remaining spaxels. The individual spectra in each bin are combined to increase
-the SNR to some target value.
+`Voronoi tessellation <https://en.wikipedia.org/wiki/Voronoi_diagram>`_ is
+performed using the `Voronoi binning algorithm
+<http://www-astro.physics.ox.ac.uk/~mxc/software/>`_ to produce bins from
+spaxels with individual S/N > 3. The individual spectra in each bin are
+combined to increase the SNR to some target value.
 
-The SNR of the spectra are calculated in a specific wavelength window (default is 5590 to 5680) and
-emission line signal-to-noise ratios can be estimated by subtracting off a
-continuum SNR (see docs for :meth:`~ifuanal.IFUCube.voronoi_bin`) ::
+The SNR of the spectra are calculated in a specific wavelength window (default
+is 5590 to 5680) and emission line signal-to-noise ratios can be estimated by
+subtracting off a continuum SNR (see docs for
+:meth:`~ifuanal.IFUCube.voronoi_bin`) ::
 
   >>> cube.voronoi_bin()
   voronoi_binning with S/N target of 20
   ... [voronoi output] ...
 
-Once complete, a file `_voronoibins.txt` will be created. Any subsequent runs of
-:meth:`~ifuanal.IFUCube.voronoi_bin` will check for this file and reuse these results instead of
-calculating (regardless of whether new arguments are passed to the method). Set ``clobber = True`` to override this behaviour and recalculate the bins.
 
-.. NOTE::
+By default a plot of the bins and their S/N will be produced and saved as
+`_bins_vor.pdf`.
 
-   Although the voronoi bins can be reread from the `_voronoibins.txt` file if
-   they have been previously calculated, any custom bins will be lost and need
-   to be :ref:`readded <custom-bins>`.
-
-`_voronoibins.pdf` will also be created for visual inspection of the bins and
-their SNRs.
+.. _hii-binning:
 
 HII region binning
 ^^^^^^^^^^^^^^^^^^
 
-.. TODO::
-   
-   This is to be added as an alternative to the voronoi binning scheme based on
-   `HII explorer`.
+This binning algorithm uses the method of `HII explorer
+<http://www.caha.es/sanchez/HII_explorer/>`_, with a python
+implementation, to grow bins around peaks in the emission line flux. ::
+
+  >>> cube.emission_line_bin(min_peak_flux=1100, min_frac_flux=0.1,
+  ... max_radius=5, min_flux=600)
+
+A description of these required arguments is available in the documentation for
+:meth:`~ifuanal.IFUCube.emission_line_bin`. These will have to be tailored to 
+each data cube. Although usually the binning will be done for the
+H\ :math:`\alpha` line, any line or wavelength can be chosen via the
+``line_lamb`` argument.
+
+Briefly, the method is:
+
+1. :func:`~ifuanal.get_line_map` is called. This returns an emission line map
+by simulating a narrowband filter observation of the datacube and subtracting a
+continuum determined by two neighbouring filters.
+
+2. All peaks equal to or above ``min_peak_flux`` in this map are found via
+:func:`scipy.ndimage.maximum_filter`. These peaks are allowed to be close as
+the subsequent growth of the bins will merge nearby peaks.
+
+3. Starting with the brightest, these peaks are the seeds for new bins. All
+   nearby pixels that satisfying the following are included in the bin:
+
+   * within ``max_radius`` of peak.
+   * flux is above ``min_flux`` and ``min_frac_flux`` :math:`\times` peak
+     flux.
+   * fas not already been allocated a bin.
+
+The resulting bins are then saved in :attr:``bin_nums``. By default a plot of
+the emission line map creation and the bins will be produced and saved as
+`_bins_el.pdf`.
 
 .. _custom-bins:
 
@@ -204,12 +257,12 @@ Adding custom bins
 ^^^^^^^^^^^^^^^^^^
 
 Custom bins can be added by defining a centre and radius. These bins will have
-negative bin numbers beginning at -1 in results.
+negative bin numbers beginning at ``-1`` in results.
 
 As an example we make an SDSS-like 3 arcsec fibre on the galaxy nucleus: ::
 
   >>> cube.add_custom_bin([160.592, 166.442], 3/0.2)
-  "added custom bin -1 to the list
+  "added custom bin -1 to the list"
 
 where 0.2 is the pixel scale of MUSE in arcsecs. Once all fitting has been performed, the results for this bin (assuming it was the first or only custom bin to be added) can be accessed via the bin number -1 in the :ref:`results-dict`
 
@@ -220,7 +273,8 @@ where 0.2 is the pixel scale of MUSE in arcsecs. Once all fitting has been perfo
 
 .. WARNING::
 
-   These bins will cover any underlying existing bins on plots.
+   Where spaxels are included in multiple bins, the plots will not represent
+   these correctly (or consistently?).
 
 .. _cont-fitting:
 
