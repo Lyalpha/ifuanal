@@ -439,7 +439,8 @@ class IFUCube(object):
         above ``min_peak_flux`` in the emission line map are seeds for bins
         which are expanded so long as neighbouring spaxels are above
         ``min_frac_flux`` of the peak and within ``max_radius``
-        distance. Pixels below ``min_flux`` are excluded from binning.
+        distance. Pixels below ``min_flux`` are excluded from binning. Values
+        should be passed in datacube counts.
 
         See :func:`~ifuanal.get_line_map` for more information on the kwargs
         used to define the wavelength windows of the line and continuum and
@@ -448,13 +449,13 @@ class IFUCube(object):
         Parameters
         ----------
         min_peak_flux : float
-            The minimum flux (in what units?!) for a spaxel to be considered as
+            The minimum flux for a spaxel to be considered as
             a new bin seed.
         min_frac_flux : float
             The minimum flux of a spaxel, as a fraction of the bin's peak flux,
             to be considered a member of the bin.
         max_radius : float
-            The maximum radius (in what units?!) allowed for a bin. Any peaks
+            The maximum radius allowed for a bin. Any peaks
             found within ``max_radius`` of the image edge will not be used.
         min_flux : float
             The minimum flux of a spaxel for consideration in the binning
