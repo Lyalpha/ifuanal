@@ -9,7 +9,7 @@ ifuanal has the following python dependencies:
 * python 2.7.11
 * numpy 1.10
 * scipy 0.15
-* matplotlib 1.3
+* matplotlib 1.5
 * astropy 1.1.1
 * astroquery 0.2.3 (optional: allows automated retrieval of Galactic
   extinction) 
