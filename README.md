@@ -8,7 +8,3 @@ continuum and emission line fitting of resolved galaxies.
 ## Documentation
 
 See [here](https://ifuanal.readthedocs.io/en/latest/) for the documentation.
-
-## History
-
-v0.1.0 - first commit
