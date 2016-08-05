@@ -32,7 +32,7 @@ tutorial by their `suffix.extension`. The prefix will be that of the cube being 
 
    In this tutorial, the markup of different objects are as follows:
    
-   * :class:`class_name`
+   * :class:`Class_Name`
    * :attr:`class_attribute`
    * :meth:`class_method`
    * ``variable_name`` (or ``argument_name``)
