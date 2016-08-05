@@ -154,6 +154,8 @@ and residual for checking (``plot=False`` to skip this).
    will use this to calculate e.g. deprojected distances of bins and provide
    maps in terms of offset from the centre.
 
+.. _binning:
+
 Binning the spaxels
 -------------------
 
