@@ -576,9 +576,6 @@ class IFUCube(object):
             binfig.suptitle("Filter centre at {}\\AA".format(line_lamb))
             binfig.savefig(self.base_name+"_bins_el.pdf", bbox_inches="tight")
 
-
-        
-
     def add_custom_bin(self, centre, r):
 
         """
@@ -1796,7 +1793,7 @@ def get_line_map(data_cube, lamb, line_lamb, filter_width=60, cont_width=60,
     idx_upp_cont1 = np.abs(lamb - upp_cont1).argmin() + 1
     idx_low_cont2 = np.abs(lamb - low_cont2).argmin()
     idx_upp_cont2 = np.abs(lamb - upp_cont2).argmin() + 1
-    # Get widths of the windows in order to normalise the 
+    # Get widths of the windows in order to normalise the
     # continuum to the filter
     filt_width = float(idx_upp_filt - idx_low_filt)
     cont1_width = float(idx_upp_cont1 - idx_low_cont1)
