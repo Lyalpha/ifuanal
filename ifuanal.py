@@ -670,12 +670,14 @@ class IFUCube(object):
 
     def get_weighted_spectrum(self, x, y):
         """
-        Return the weighted median spectrum for spaxels at locations ``x``, ``y``.
+        Return the weighted mean spectrum for spaxels at locations ``x``,
+        ``y``.
 
         Similar to ``get_single_spectrum`` except ``x`` and ``y`` are arrays.
         The single spectra given by these locations are combined using the
         weighted mean of the fluxes. Returns array of same form as 
         ``get_single_spectrum``.
+
         """
         # Use weighted arthimetic mean and variance of weighted mean
         # arrays to hold all the flux and flux_stddev values in spaxels
@@ -1002,7 +1004,6 @@ class IFUCube(object):
 
         axresid = slfig.add_subplot(gs[3,0], sharex=axol)
         axresid.plot(lamb, resid, c=OBSCOL, ls="-", lw=1, label="residual")
-        #axresid.plot(lamb, masked, c=MASKCOL, ls="-", lw=1, label="masked")
         axresid.plot(lamb, clipped, c=CLIPPEDCOL, ls="-", lw=1, label="clipped")
         for idx in slice_idxs:
             axresid.axvspan(self.lamb[idx[0]], self.lamb[idx[1]], color=MASKCOL,
