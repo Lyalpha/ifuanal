@@ -4,7 +4,7 @@ IFUANAL
 For the analysis of IFU data cubes.
 """
 
-__version__ = "0.2.0"
+__version__ = "0.2.0dev"
 __author__ = "J. Lyman"
 
 from itertools import repeat, cycle, product
@@ -427,8 +427,8 @@ class IFUCube(object):
 
 
     def emission_line_bin(self, min_peak_flux, min_frac_flux, max_radius,
-                          min_flux, line_lamb=6562.8, plot=True, clobber=False,
-                          **kwargs):
+                          min_flux, min_npix=8, line_lamb=6562.8, plot=True,
+                          clobber=False, **kwargs):
         """
         Apply the HII explorer [SFS]_ binning algorithm to the datacube.
 
@@ -460,6 +460,8 @@ class IFUCube(object):
         min_flux : float
             The minimum flux of a spaxel for consideration in the binning
             routine.
+        min_npix : float, optional
+            The minimum number of pixels required for a bin.
         line_lamb : float, optional
             The wavelength of the emission line to use (defaults to H$\\alpha$).
         plot : bool, optional
@@ -533,8 +535,8 @@ class IFUCube(object):
 
             # Make cutouts around our peak to check:
             # - the distance of the spaxels
-            x_cen = np.arange(-math.ceil(r),math.ceil(r)+1,1)
-            y_cen = np.arange(-math.ceil(r),math.ceil(r)+1,1)
+            x_cen = np.arange(-r,r+1,1)
+            y_cen = np.arange(-r,r+1,1)
             xx,yy = np.meshgrid(x_cen,y_cen)
             dists = np.sqrt(xx * xx + yy * yy)
             # - the flux of the spaxels
@@ -546,7 +548,12 @@ class IFUCube(object):
             bin_cutout = (dists <= max_radius) \
                          & (fluxes >= thresh_flux) \
                          & (np.isnan(allocs))
-            if np.sum(bin_cutout) > 0:
+            # We only want adjoining pixels to be considered so remove
+            # separate (not-touching) objects
+            struct = ndimage.generate_binary_structure(2, 2)
+            objs, nobj = ndimage.label(bin_cutout, structure=struct)
+            bin_cutout[np.where(objs != objs[r,r])] = 0
+            if np.sum(bin_cutout) >= min_npix:
                 # Update the bin_map with this bin number
                 bin_map[x-r:x+r+1, y-r:y+r+1][bin_cutout] = b
                 # Add a bin entry to our dict
