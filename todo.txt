@@ -9,6 +9,11 @@
 #          NII 1, then split by balmer and forbidden?  When constructing
 #          emissionline model need to rename them to the name of the lines?
 
+#TODO    : remove all fobs_norm by just multiplying the starlight results
+#          in order to match the inspection and plotting of spectra and
+#          the emission line models etc. Will need to update initial amplitude
+#	   guesses for run_emission_lines
+
 #TODO    : add a binning method that uses image segmentation via photutils
 #          and is similar to SExtractor
 
