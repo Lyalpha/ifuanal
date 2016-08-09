@@ -1320,6 +1320,7 @@ class IFUCube(object):
             ew = []
             ew_uncert = []
             fluxes = []
+            fluxes_uncert = []
             bin_res = self.results["bin"][bn]
             emline_model = bin_res["emline_model"]
             for submodel_name  in emline_model.submodel_names:
@@ -1339,18 +1340,26 @@ class IFUCube(object):
                              param_uncerts[desname[submodel_name[-2:]]]
                 #FIXME needs generalising!!!
                 submodel = emline_model[submodel_name]
-                _ew = (2*math.pi)**0.5 * submodel.stddev * submodel.amplitude
-                # Uncertainty formula from LG IDL
-                _ew_uncert = ((2*math.pi)**0.5
-                              * ((stddev_uncert * submodel.amplitude)**2
-                                 + (submodel.stddev * amp_uncert)**2)**0.5) 
-                ew.append(_ew)
-                ew_uncert.append(_ew_uncert)
+                # Get line flux. Uncertainty formula from LG IDL
+                flux = ((2*math.pi)**0.5 * submodel.stddev * submodel.amplitude
+                        * bin_res["fobs_norm"])
+                flux_uncert = ((2*math.pi)**0.5
+                               * ((stddev_uncert * submodel.amplitude)**2
+                                  + (submodel.stddev * amp_uncert)**2)**0.5
+                               * bin_res["fobs_norm"])
+                # Find the lambda index of our line's mean and get the
+                # value of the continuum there
+                lamb_idx = np.abs(self.lamb - submodel.mean).argmin()
+                cont = bin_res["sl_spec"][lamb_idx, 2] * bin_res["fobs_norm"]
+
+                fluxes.append(flux)
+                fluxes_uncert.append(flux_uncert)
+                ew.append(flux/cont)
+                ew_uncert.append(flux_uncert/cont)
             bin_res["emline_ew"] = np.array(ew)
             bin_res["emline_ew_uncert"] = np.array(ew_uncert)
-            bin_res["emline_fluxes"] = np.array(ew) * bin_res["fobs_norm"]
-            bin_res["emline_fluxes_uncert"] = (np.array(ew_uncert) *
-                                               bin_res["fobs_norm"])
+            bin_res["emline_fluxes"] = np.array(fluxes)
+            bin_res["emline_fluxes_uncert"] = np.array(fluxes_uncert)
 
     def get_emission_line_metallicities(self, bin_num=None):
         """
