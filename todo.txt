@@ -9,6 +9,9 @@
 #          NII 1, then split by balmer and forbidden?  When constructing
 #          emissionline model need to rename them to the name of the lines?
 
+#TODO    : add a binning method that uses image segmentation via photutils
+#          and is similar to SExtractor
+
 #TODO    : bin_inspection - i.e.: make a plot of all indiv specs in bin and the
 #          weighted spec, show location on voronoi plot, print results of
 #          fitting, overplot fit on weighted spec etc.
