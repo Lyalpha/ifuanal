@@ -704,12 +704,10 @@ class IFUCube(object):
         # Use masked arrays to cover the nans while preserving shape
         spaxels_flux_ma = np.ma.masked_array(spaxels_flux, bad_idx)
         spaxels_stddev_ma = np.ma.masked_array(spaxels_stddev, bad_idx)
-        # Calculate the weighted mean
-        spec[:,1] = np.ma.average(spaxels_flux_ma,
-                                  weights=1/spaxels_stddev_ma**2, axis=1)
-        # Calculate the weighted stddev
-        diff = spaxels_flux_ma - spec[:,1][:,None]
-        var = np.ma.average(diff**2, weights=1/spaxels_stddev_ma**2, axis=1)
+        # Calculate the weighted mean and stddev
+        w = 1/spaxels_stddev_ma**2
+        spec[:,1] = np.ma.average(spaxels_flux_ma, weights=w, axis=1)
+        var = np.ma.average(spaxels_stddev_ma**2, weights=w, axis=1)
         spec[:,2] = np.ma.sqrt(var)
         # STARLIGHT ignores flags >=2
         spec[:,3] = bad_lamb.astype("int") * 2
