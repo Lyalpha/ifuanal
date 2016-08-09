@@ -1055,13 +1055,15 @@ class IFUCube(object):
         axmass.set_xlabel("$\\log_{10}$ Age$_\\star$ [years]")
         axmass.set_ylabel("Mcor$_\\textrm{{j}}$ [\%]")
 
-        slfig.text(0.15, 1.0, "$\chi^{{2}}/\\textrm{{dof}} = {:4.2f}$, "
-                   "N$_\\textrm{{spax}} = {:3}$, A$_\\textrm{{v}} = "
-                   "{:5.3f}$".format(res["chi2/Nl_eff"],len(res["x_spax"]),
-                                     res["AV_min"]),color="k", size=12)
-        slfig.text(0.15, 0.96, "$\\sigma_\\star = {:6.2f}$ km s$^{{-1}}$, "
-                   "$v_\\star = {:6.2f}$ km s$^{{-1}}$".format(
-                       res["vd_min"], res["v0_min"]), color="k", size=12)
+        slfig.text(0.15, 1.0, "$\chi^{{2}}/\\textrm{{dof}} = {:.3f}$, "
+                   "$\\bar{{x}} = {:.2f}$, $\\bar{{y}} = {:.2f}$".format(
+                   res["chi2/Nl_eff"], res["x_bar"], res["y_bar"]),color="k",
+                   size=12)
+
+        slfig.text(0.15, 0.96, "A$_\\textrm{{v}} = {:5.3f}$, $\\sigma_\\star = "
+                   "{:6.2f}$ km s$^{{-1}}$, $v_\\star = {:6.2f}$ km "
+                   "s$^{{-1}}$".format( res["AV_min"], res["vd_min"],
+                   res["v0_min"]), color="k", size=12)
         slfig.tight_layout()
         slfig.subplots_adjust(hspace=0.1)
         slfig.savefig(self.base_name+"_sl_fit_{}.png".format(bin_num),
@@ -1462,10 +1464,10 @@ class IFUCube(object):
         plt.ylim(np.min((emline_obs-emline_uncert)[visible]),
                  np.max((emline_obs+emline_uncert)[visible]))
 
-        elfig.text(0.15, 1.0, "Bin num = {}, $\\bar{{x}} = {:.2f}$, "
-                   "$\\bar{{y}} = {:.2f}$, $\\chi^2/\\textrm{{dof}} = {:.3f}$"
-                   .format(bin_num, res["x_bar"], res["y_bar"], 
-                           res["emline_model"].chi2dof),color="k", size=12)
+        elfig.suptitle("$\\chi^2/\\textrm{{dof}} = {:.3f}$, " "$\\bar{{x}} = "
+                       "{:.2f}$, $\\bar{{y}} = {:.2f}$"
+                       .format(res["emline_model"].chi2dof, res["x_bar"],
+                               res["y_bar"], ),color="k", size=12)
         elfig.subplots_adjust(wspace=0.1)
         elfig.savefig(self.base_name+"_el_fit_{}.png".format(bin_num),
                       bbox_inches="tight",dpi=300)
