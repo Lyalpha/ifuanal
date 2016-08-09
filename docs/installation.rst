@@ -16,14 +16,11 @@ ifuanal has the following python dependencies:
 * dill 0.2.5
 * pathos 0.2
 
-A recommended way to set this up is to install `astroconda
-<http://astroconda.readthedocs.io/en/latest/installation.html>`_ and
-install extra dependancies from within your astroconda environment
-with::
+Dependancies can be installed from within a suitable python environment via:::
 
-     $ pip install astroquery
-     $ pip install dill
-     $ pip install pathos
+     $ cd /path/to/ifuanal
+     $ pip install -r requirements.txt
+     $ pip install astroquery # optional
 
 .. _starlight-install:
 
