@@ -630,26 +630,25 @@ class IFUCube(object):
         Parameters
         ----------
         loc : array_like
-            Length 2 array giving the (``x``, ``y``) to get bin number for.
+            Length 2 array giving the (``x``, ``y``) pixel coordinates to get
+            the bin number of.
 
         Returns
         -------
         bin_num : int
-            The bin number that contains ``loc``. Returns None if not in any bin.
+            The bin number that contains ``loc``. Returns None if not in any
+            bin.
         """
-        #FIXME
-        return
         x, y = map(int, loc)
-        idx = np.where((self.vor_output[:,:2] == [x,y]).all(axis=1))[0]
-        if idx.size == 1:
-            return np.asscalar(self.vor_output[idx,3])
-        else:
-            print("didn't find a bin at location {}, {}".format(x,y))
-            return None
+        for bn in self._get_bin_nums():
+            bn_x, bn_y = self.bin_nums[bn]["spax"]
+            if x in bn_x and y in bn_y:
+                return bn
+        print("didn't find a bin at location {}, {}".format(x,y))
+        return None
 
     def _get_bin_nums(self):
         return self.bin_nums.keys()
-
 
     def get_single_spectrum(self, x, y):
         """
