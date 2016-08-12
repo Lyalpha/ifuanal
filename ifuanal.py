@@ -354,7 +354,7 @@ class IFUCube(object):
                 raise AttributeError("``bin_nums`` already exists, use clobber"
                                      " to overwrite")
 
-        print("Binning spaxels with Voronoi algorithm with "
+        print("binning spaxels with Voronoi algorithm with "
               "S/N target of {}".format(target_sn))
 
         if not all((self.lamb[0] < lamb_low < self.lamb[-1], 
@@ -495,7 +495,7 @@ class IFUCube(object):
             print "``min_peak_flux > min_flux`` is required"
             return
 
-        print("Binning spaxels using HII explorer algorithm around emission "
+        print("binning spaxels using HII explorer algorithm around emission "
               "line {}".format(line_lamb))
 
         r = math.ceil(max_radius)
@@ -562,6 +562,8 @@ class IFUCube(object):
                 # We swap the x and y to FITS standard in the dict
                 b += 1 # update bin number
         self.bin_nums = bin_nums
+
+        print "found {} bins".format(len(self.bin_nums))
 
         if plot:
             plt.close()
@@ -648,7 +650,7 @@ class IFUCube(object):
         return None
 
     def _get_bin_nums(self):
-        return self.bin_nums.keys()
+        return sorted(self.bin_nums.keys())
 
     def get_single_spectrum(self, x, y):
         """
@@ -917,7 +919,6 @@ class IFUCube(object):
             return
 
         self.results = {}
-        self.results["nucelus"] = self.nucleus
 
         # Populate bin entries in advance
         self.results["bin"] = dict.fromkeys(bin_num)
@@ -951,9 +952,9 @@ class IFUCube(object):
                                                            (y_bar - ny)**2)**0.5
 
                 else:
-                    self.results["bin"][bn]["distance_min"] = None
-                    self.results["bin"][bn]["distance_max"] = None
-                    self.results["bin"][bn]["distance_bar"] = None
+                    self.results["bin"][bn]["dist_min"] = None
+                    self.results["bin"][bn]["dist_max"] = None
+                    self.results["bin"][bn]["dist_bar"] = None
             else:
                 print("Removing bin {}, No sl_output found".format(bn))
                 self.results["bin"].pop(bn)
@@ -1084,7 +1085,7 @@ class IFUCube(object):
                                     d[key]["emline_model"].chi2dof))[-N:]
         worst_bins = set(worst_sl_bins + worst_el_bins)
         for wb in worst_bins:
-            self.plot_sl_results(wb)
+            self.plot_continuum(wb)
             self.plot_emission_lines(wb)
 
 
@@ -1158,7 +1159,7 @@ class IFUCube(object):
         plt.savefig(self.base_name+"_yio.pdf", bbox_inches="tight")
         print("plot saved to {}".format(self.base_name+"_yio.pdf"))    
 
-    def plot_kinematic(self, norm_v0=0):
+    def plot_kinematics(self, norm_v0=0):
         """
         Plot the kinematics of the host.
 
@@ -1173,12 +1174,11 @@ class IFUCube(object):
             values will be v0 - norm_v0). The special case "nucleus" will set 
             the zero-point as the value of the nucelus bin.
         """
-        print "kinematic_plots()"
 
         v0 = np.empty(self.data_cube.shape[1:]) * np.nan
         vd = np.empty(self.data_cube.shape[1:]) * np.nan
         if norm_v0 == "nucleus":
-            bn = self.get_bin_num(self.nucleus)
+            bn = self.get_loc_bin(self.nucleus)
             norm_v0 = self.results["bin"][bn]["v0_min"]
         elif not isinstance(norm_v0, (float,int)):
             print "norm_v0 must be 'nucleus' or a float/int"
@@ -1397,6 +1397,8 @@ class IFUCube(object):
             # We only consider fluxes with S/N > 3
             f_snr = f/f_uncert
             f[f_snr < 3] = np.nan
+            # And any zero fluxes are ignored
+            f[f == 0] = np.nan
             fluxes = {"Halpha":f[0], "Hbeta":f[1], "[NII]6548":f[2], 
                          "[NII]6583":f[3], "[SII]6716":f[4], "[SII]6731":f[5], 
                          "[OIII]4959":f[6], "[OIII]5007":f[7]}
