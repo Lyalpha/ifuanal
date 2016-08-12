@@ -1484,7 +1484,7 @@ class IFUCube(object):
         print("plot saved to {}_el_fit_{}.png".format(self.base_name, bin_num))
 
 
-    def plot_metallicity(self, indicator="D16", zmin=None, zmax=None):
+    def plot_metallicity(self, indicator="D16"):
         """
         Plot the metallicity of the host.
 
@@ -1497,32 +1497,61 @@ class IFUCube(object):
         indicator: str
             The metallicity indicator to plot, current options are "PP04_N2",
             "PP04_O3N2", "M13", "D16".
-        zmin, zmax: float, optional
-            Specify the limits (in :math:`12+\log(O/H)`) for the colourmap,
-            otherwise the min and max metallicities will be the bounds.
         """
 
         valid_indicators = ["PP04_N2", "PP04_O3N2", "M13", "D16"]
         if indicator not in valid_indicators:
             raise AttributeError("`indicator` must be one of {}"
                                  .format(valid_indicators))
+        # Initialise an empty map to populate with Z values
+        Zmap = np.empty(self.data_cube.shape[1:]) * np.nan
+        Zvals = np.empty(len(self._get_bin_nums())) * np.nan
+        # Hold the mean, min and max distance of the bins from the nucleus
+        dists = np.empty((len(self._get_bin_nums()), 3)) * np.nan
 
-        Z = np.empty(self.data_cube.shape[1:]) * np.nan
-        for b in self.results["bin"]:
-            r = self.results["bin"][b]
-            Z[r["y_spax"],r["x_spax"]] = r["metallicity"][indicator]
+        for i,bn in enumerate(self._get_bin_nums()):
+            r = self.results["bin"][bn]
+            Z = r["metallicity"][indicator]
+            Zmap[r["y_spax"],r["x_spax"]] = Z
+            Zvals[i] = Z
+            dists[i] = (r["dist_bar"], r["dist_min"], r["dist_max"])
+        Zvalsnn = Zvals[~np.isnan(Zvals)] # no nans
 
-        plt.close("all")
-        plt.imshow(Z, origin="lower", interpolation="none", vmin=zmin,
-                   vmax=zmax)
-        plt.colorbar(label="$Z$ [$12 + \log_{10}(\\textrm{O}/\\textrm{H})$]",
-                     orientation="horizontal").ax.tick_params(labelsize=16)
-        plt.plot(self.nucleus[0], self.nucleus[1], "kx", markersize=10)
+        zfig = plt.figure()
+        gs = gridspec.GridSpec(2, 2, height_ratios=[1, 1],
+                               width_ratios=[2,1])
+        # A map of the bins and their Z values
+        axmap = zfig.add_subplot(gs[:,0])
+        m = axmap.imshow(Zmap, origin="lower", interpolation="none")
+        c = plt.colorbar(mappable=m, ax=axmap, orientation="horizontal",
+                         label="$Z$ [$12 + \log_{10}(\\textrm{O/H})$]")
+        c.ax.tick_params(labelsize=16)
+        axmap.autoscale(False)
+        axmap.plot(self.nucleus[0], self.nucleus[1], "kx", markersize=10)
+        # A cumulative histogram of the Z values
+        axcum = zfig.add_subplot(gs[0,1])
+        n,b,p = axcum.hist(Zvalsnn, cumulative=True,
+                           normed=True, histtype="step", linewidth=3,
+                           bins=len(self._get_bin_nums()), color=c.cmap(0.5))
+        p[0].set_xy(p[0].get_xy()[:-1])
+        axcum.set_xlim(min(Zvalsnn), np.max(Zvalsnn))
+        axcum.set_ylim(0, 1)
+        axcum.set_xlabel("$Z$ [$12 + \log_{10}(\\textrm{O/H})$]")
+        axcum.set_ylabel("Cumulative Fraction")
+        # A plot of the Z value vs radial distance from nucleus
+        axrad = zfig.add_subplot(gs[1,1])
+        axrad.errorbar(dists[:,0], Zvals, xerr=[(dists[:,0]-dists[:,1]),
+                       (dists[:,2]-dists[:,0])], color=c.cmap(0.5), ls="none",
+                       marker="o", mew=0.3, ms=4, capsize=0,
+                       ecolor=c.cmap(0.5))
+        axrad.set_xlabel("Distance from nucleus [pixels]")
+        axrad.set_ylabel("$Z$ [$12 + \log_{10}(\\textrm{O/H})$]")
+        zfig.tight_layout()
+        zfig.savefig(self.base_name+"_metallicity_{}.pdf".format(indicator),
+                     bbox_inches="tight")
 
-        plt.savefig(self.base_name+"_metallicity_{}.pdf".format(indicator),
-                    bbox_inches="tight")
         print("plot saved to {}_metallicity_{}.pdf".format(self.base_name,
-                                                      indicator))
+                                                           indicator))
 
     def make_emission_line_cube(self, clobber=False):
         """
