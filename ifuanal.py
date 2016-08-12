@@ -1399,18 +1399,17 @@ class IFUCube(object):
             f[f_snr < 3] = np.nan
             # And any zero fluxes are ignored
             f[f == 0] = np.nan
-            fluxes = {"Halpha":f[0], "Hbeta":f[1], "[NII]6548":f[2], 
+            fd = {"Halpha":f[0], "Hbeta":f[1], "[NII]6548":f[2],
                          "[NII]6583":f[3], "[SII]6716":f[4], "[SII]6731":f[5], 
                          "[OIII]4959":f[6], "[OIII]5007":f[7]}
             bin_res["metallicity"] = {}
 
             #TODO allow custom indicators to be passed, or add
             # data/metallicity_indicators.json
-            O3 = np.log10(fluxes["[OIII]5007"]/fluxes["Hbeta"])
-            N2 = np.log10(fluxes["[NII]6583"]/fluxes["Halpha"])
-            y = (np.log10(fluxes["[NII]6583"]/(fluxes["[SII]6716"] 
-                                               + fluxes["[SII]6731"]))
-                 + 0.264 * N2) # Dopita+16
+            O3 = np.log10(fd["[OIII]5007"]/fd["Hbeta"])
+            N2 = np.log10(fd["[NII]6583"]/fd["Halpha"])
+            N2S2 = np.log10(fd["[NII]6583"]/(fd["[SII]6716"] + fd["[SII]6731"]))
+            y = N2S2 + 0.264 * N2 # Dopita+16
 
             bin_res["metallicity"]["PP04_N2"] = 8.90 + 0.57 * (N2)
             bin_res["metallicity"]["PP04_O3N2"] = 8.73 - 0.32 * (O3/N2)
