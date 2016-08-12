@@ -1406,14 +1406,15 @@ class IFUCube(object):
 
             #TODO allow custom indicators to be passed, or add
             # data/metallicity_indicators.json
-            O3 = np.log10(fd["[OIII]5007"]/fd["Hbeta"])
             N2 = np.log10(fd["[NII]6583"]/fd["Halpha"])
+            O3N2 = np.log10((fd["[OIII]5007"]/fd["Hbeta"])
+                            / (fd["[NII]6583"]/fd["Halpha"]))
             N2S2 = np.log10(fd["[NII]6583"]/(fd["[SII]6716"] + fd["[SII]6731"]))
             y = N2S2 + 0.264 * N2 # Dopita+16
 
-            bin_res["metallicity"]["PP04_N2"] = 8.90 + 0.57 * (N2)
-            bin_res["metallicity"]["PP04_O3N2"] = 8.73 - 0.32 * (O3/N2)
-            bin_res["metallicity"]["M13"] = 8.533 - 0.214 * (O3/N2)
+            bin_res["metallicity"]["PP04_N2"] = 8.90 + 0.57 * N2
+            bin_res["metallicity"]["PP04_O3N2"] = 8.73 - 0.32 * O3N2
+            bin_res["metallicity"]["M13"] = 8.533 - 0.214 * O3N2
             bin_res["metallicity"]["D16"] = 8.77 + y
 
     def plot_emission_lines(self, bin_num):
