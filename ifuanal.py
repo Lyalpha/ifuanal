@@ -3,9 +3,11 @@ IFUANAL
 
 For the analysis of IFU data cubes.
 """
+from __future__ import print_function
 
 __version__ = "0.2.0dev"
 __author__ = "J. Lyman"
+
 
 from itertools import repeat, cycle, product
 import json
@@ -133,7 +135,7 @@ class IFUCube(object):
         """
         ebv = self.data_cube.header["IFU_EBV"]
         if ebv == 0:
-            print "ebv = 0, skipping deredden()"
+            print("ebv = 0, skipping deredden()")
             return
         print("dereddening with E(B-V) = {:.3f}mag and RV = {}"
               .format(ebv, self.RV))
@@ -492,7 +494,7 @@ class IFUCube(object):
                                      " to overwrite")
 
         if min_flux >= min_peak_flux:
-            print "``min_peak_flux > min_flux`` is required"
+            print("``min_peak_flux > min_flux`` is required")
             return
 
         print("binning spaxels using HII explorer algorithm around emission "
@@ -563,7 +565,7 @@ class IFUCube(object):
                 b += 1 # update bin number
         self.bin_nums = bin_nums
 
-        print "found {} bins".format(len(self.bin_nums))
+        print("found {} bins".format(len(self.bin_nums)))
 
         if plot:
             plt.close()
@@ -730,8 +732,7 @@ class IFUCube(object):
             x_spax, y_spax = self.bin_nums[bn]["spax"]
             spaxels_num = len(x_spax)
             print("Calculating weighted mean of {:>3} spaxels in bin {:>5} "
-                  "({:>5}/{:>5})\r".format(spaxels_num, bn, i, n_bins)),
-            sys.stdout.flush()
+                  "({:>5}/{:>5})".format(spaxels_num, bn, i, n_bins), end="\r")
 
             if spaxels_num == 0:
                 raise ValueError("No spaxels found in bin number: "
@@ -806,7 +807,7 @@ class IFUCube(object):
                     self.sl_output[int(bn)] = [of, sf]
                 return
         elif clobber and append:
-            print("can't `clobber` *and* `append`.")
+            print("can't `clobber` *and* `append`")
             return
         elif not clobber and append:
             pass
@@ -839,11 +840,10 @@ class IFUCube(object):
             basefiles = [os.path.join(d, f) for f in os.listdir(d)]
             Nbasefiles = len(basefiles)
             for i, basefile in enumerate(basefiles,1):
-                print("resampling base files {:>4}/{:4}\r".format(i,
-                                                                 Nbasefiles)),
-                sys.stdout.flush()
+                print("resampling base files {:>4}/{:4}".format(i,Nbasefiles),
+                      end="\r")
                 resample_base(basefile, self.lamb, self.delta_lamb)
-        print
+        print()
         # Compute the spectra and write the spectrum to a temp file
         spectra = self.yield_spectra(bin_num)
         spec_files = []
@@ -852,7 +852,7 @@ class IFUCube(object):
                                              delete=False) as spec_file:
                 np.savetxt(spec_file, spec, fmt="%14.8f")
                 spec_files.append(spec_file.name)
-        print
+        print()
         # multiprocessing params for starlight pool of workers
         p = mp.Pool(self.n_cpu)
         bin_out_files = p.map(fit_starlight, 
@@ -866,7 +866,7 @@ class IFUCube(object):
                                   repeat(lamb_upp)))
         p.close()
         p.join()    
-        print("Starlight fits of {} bins complete".format(len(bin_num)))
+        print("STARLIGHT fits of {} bins complete".format(len(bin_num)))
 
         #TODO
         #if append:
@@ -924,12 +924,12 @@ class IFUCube(object):
         self.results["bin"] = dict.fromkeys(bin_num)
         n_bins = len(bin_num)
         for i, bn in enumerate(bin_num, 1):
-            print("parsing starlight output {:5}/{:5}\r".format(i, n_bins)),
-            sys.stdout.flush()
+            print("parsing starlight output {:5}/{:5}".format(i, n_bins), 
+                  end="\r")
             if self.sl_output[bn][0] is not None:
                 self.results["bin"][bn] = parse_starlight(self.sl_output[bn][0])
                 if self.results["bin"][bn] is None: #i.e. failed to get Nl_Obs
-                    print("Removing bin {}, failed to parse {}"
+                    print("removing bin {}, failed to parse {}"
                           .format(bn, self.sl_output[bn][0]))
                     self.results["bin"].pop(bn)
                     self.bin_nums.pop(bn)
@@ -956,7 +956,7 @@ class IFUCube(object):
                     self.results["bin"][bn]["dist_max"] = None
                     self.results["bin"][bn]["dist_bar"] = None
             else:
-                print("Removing bin {}, No sl_output found".format(bn))
+                print("removing bin {}, No sl_output found".format(bn))
                 self.results["bin"].pop(bn)
                 self.bin_nums.pop(bn)
 
@@ -1080,9 +1080,11 @@ class IFUCube(object):
         worst_sl_bins = sorted(d.iterkeys(), 
                                key=(lambda key:
                                     d[key]["chi2/Nl_eff"]))[-N:]
+        print("worst continuum fitted bins: {}".format(worst_sl_bins))
         worst_el_bins = sorted(d.iterkeys(), 
                                key=(lambda key:
                                     d[key]["emline_model"].chi2dof))[-N:]
+        print("worst emission line fitted bins: {}".format(worst_el_bins))
         worst_bins = set(worst_sl_bins + worst_el_bins)
         for wb in worst_bins:
             self.plot_continuum(wb)
@@ -1181,7 +1183,7 @@ class IFUCube(object):
             bn = self.get_loc_bin(self.nucleus)
             norm_v0 = self.results["bin"][bn]["v0_min"]
         elif not isinstance(norm_v0, (float,int)):
-            print "norm_v0 must be 'nucleus' or a float/int"
+            print("norm_v0 must be 'nucleus' or a float/int")
             return
         for b in self.results["bin"]:
             r = self.results["bin"][b]
@@ -1274,7 +1276,7 @@ class IFUCube(object):
                                    repeat(weights)))
         p.close()
         p.join()
-        print
+        print()
         print("emission line fitting complete")
         for bn, emline_model in emline_results:
             # if we have no param uncertainties then the fit is at the bounds
@@ -1313,9 +1315,8 @@ class IFUCube(object):
         # in param_uncerts - not general!!!!
         desname = {"_0":0,"_1":3,"_2":4,"_3":5,"_4":8,"_5":9,"_6":10,"_7":11}
         for i,bn in enumerate(bin_num,1):
-            print("getting emission line fluxes {:>5}/{:5}\r".format(i,
-                                                                     n_bins)),
-            sys.stdout.flush()
+            print("getting emission line fluxes {:>5}/{:5}".format(i, n_bins),
+                  end="\r")
             ew = []
             ew_uncert = []
             fluxes = []
@@ -1388,9 +1389,8 @@ class IFUCube(object):
         # [OIII]4959, [OIII]5007
         n_bins = len(bin_num)
         for i,bn in enumerate(bin_num,1):
-            print("getting emission line metallicities {:>5}/{:5}\r".format(i,
-                                                                       n_bins)),
-            sys.stdout.flush()
+            print("getting emission line metallicities {:>5}/{:5}"
+                  .format(i,n_bins), end="\r")
             bin_res = self.results["bin"][bn]
             f = bin_res["emline_fluxes"]
             f_uncert = bin_res["emline_fluxes_uncert"]
@@ -1569,7 +1569,7 @@ class IFUCube(object):
         """
         outfile = self.base_name+"_emissionline.fits"
         if not clobber and os.path.isfile(outfile):
-                print "{} exists and clobber is false".format(outfile)
+                print("{} exists and clobber is false".format(outfile))
                 return
 
         # make a dummy cube to hold the emission line spectra
@@ -1590,7 +1590,7 @@ class IFUCube(object):
                                      header=self.stddev_cube.header))
         hdulist.writeto(outfile, clobber=clobber)
 
-        print("Emission line cube saved to {}".format(outfile))
+        print("emission line cube saved to {}".format(outfile))
 
     def make_continuum_cube(self):
         """
@@ -1600,7 +1600,7 @@ class IFUCube(object):
         To be implemented.
         """
         pass
-        #print("Continuum cube saved to {}".format(outfile))
+        #print("continuum cube saved to {}".format(outfile))
 
     @classmethod
     def load_pkl(self, pkl_file):
@@ -1622,7 +1622,7 @@ class IFUCube(object):
         except IOError:
             raise IOError("Couldn't create instance from pickle file"
                           " {}".format(pkl_file))
-        print "loaded pkl file {}".format(pkl_file)
+        print("loaded pkl file {}".format(pkl_file))
 
     def save_pkl(self, pkl_file=None):
         """
@@ -1651,10 +1651,10 @@ class IFUCube(object):
         # We write to a temporary file for safety - if there's pickling
         # errors, we don't want to overwrite our previous pickle.
         temp = tempfile.mkstemp(prefix="ifuanal_", suffix=".pkl", dir=".")[1]
-        print "writing to temporary pickle file {}".format(temp)
+        print("writing to temporary pickle file {}".format(temp))
         with open(temp, "wb") as output:
             pickle.dump(self.__dict__, output)
-        print "moving to {}".format(pkl_file)
+        print("moving to {}".format(pkl_file))
         shutil.move(temp, pkl_file)
         
 class EmissionLineModel(models.Gaussian1D + models.Gaussian1D +
@@ -1734,8 +1734,8 @@ def get_IRSA_ebv(header):
                    unit=(header["CUNIT1"], header["CUNIT2"]))
     tbl = IrsaDust.get_query_table(coo, section="ebv")
     ebv = float(tbl["ext SandF mean"])
-    print "for location '{:}' found E(B-V) of {:5.3f}".format(coo.to_string(),
-                                                              ebv)
+    print("for location '{:}' found E(B-V) of {:5.3f}".format(coo.to_string(),
+                                                              ebv))
     return ebv
 
 
@@ -1891,8 +1891,7 @@ def fit_starlight(fargs):
     """
     bin_num, spec_file, lamb, delta_lamb, tmp_dir, bases, low_sn, upp_sn = fargs
 
-    print "Fitting bin number {:>5}\r".format(bin_num),
-    sys.stdout.flush()
+    print("fitting bin number {:>5}".format(bin_num), end="\r")
 
     out_file = os.path.basename(spec_file)+"_out"
     # Write a grid file for starlight (see manual)
@@ -1934,8 +1933,7 @@ def fit_starlight(fargs):
 
 def fit_emission_lines(fargs):
     bin_num, bin_res, el, vd_init, v0_init, amp_init, stddev_b, off_b, w = fargs
-    print "Fitting bin number {:>5}\r".format(bin_num),
-    sys.stdout.flush()
+    print("fitting bin number {:>5}".format(bin_num), end="\r")
 
     spec = bin_res["sl_spec"]
 
@@ -2063,7 +2061,7 @@ def parse_starlight(sl_output):
     try:
         lines = open(sl_output).readlines()
     except IOError:
-        print "cannot open {}!".format(sl_output)
+        print("cannot open {}!".format(sl_output))
         return None
     n_lines = len(lines)
     if n_lines < 20:
