@@ -17,6 +17,9 @@
 #TODO    : add a binning method that uses image segmentation via photutils
 #          and is similar to SExtractor
 
+#TODO    : on plots (esp. metallicity) highlight the location of custom bins
+#          on histogram/radial plot
+
 #TODO    : bin_inspection - i.e.: make a plot of all indiv specs in bin and the
 #          weighted spec, show location on voronoi plot, print results of
 #          fitting, overplot fit on weighted spec etc.
