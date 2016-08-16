@@ -1182,6 +1182,9 @@ class IFUCube(object):
         vd = np.empty(self.data_cube.shape[1:]) * np.nan
         if norm_v0 == "nucleus":
             bn = self.get_loc_bin(self.nucleus)
+            if bn is None:
+                print("nucleus is not in a bin")
+                return
             norm_v0 = self.results["bin"][bn]["v0_min"]
         elif not isinstance(norm_v0, (float,int)):
             print("norm_v0 must be 'nucleus' or a float/int")
@@ -1193,7 +1196,7 @@ class IFUCube(object):
 
         plt.close("all")
         v0min, v0max = np.nanmin(v0), np.nanmax(v0)
-        v0cmap = shiftedColorMap(cm.coolwarm, 
+        v0cmap = shiftedColorMap(cm.coolwarm,
                                  midpoint=(1. - v0max/(v0max + abs(v0min))))
         ax1 = plt.subplot(121, adjustable="box-forced")
         plt.imshow(v0, origin="lower", interpolation="none", cmap=v0cmap)
