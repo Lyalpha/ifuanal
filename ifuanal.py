@@ -816,10 +816,10 @@ class IFUCube(object):
 
         if bin_num is None:
             bin_num = self._get_bin_nums()
-        elif bin_num not in self._get_bin_nums():
-            raise ValueError("Bin number {} does not exist".format(bin_num))
         elif isinstance(bin_num, (int,float)):
             bin_num = [bin_num]
+        if not np.all(np.in1d(bin_num, self._get_bin_nums())):
+            raise ValueError(">=1 bin numbers given do not exist")
         print("fitting {} bins...".format(len(bin_num)))
         if use_tmp_dir:
             sl_tmp_dir = os.path.join(use_tmp_dir,"")
@@ -909,10 +909,10 @@ class IFUCube(object):
             raise("``bin_nums`` not found, run a binning routine first")
         if bin_num is None:
             bin_num = self._get_bin_nums()
-        elif bin_num not in self._get_bin_nums():
-            raise ValueError("Bin number {} does not exist".format(bin_num))
         elif isinstance(bin_num, (int,float)):
             bin_num = [bin_num]
+        if not np.all(np.in1d(bin_num, self._get_bin_nums())):
+            raise ValueError(">=1 bin numbers given do not exist")
 
         tmp_dir = os.path.dirname(self.sl_output[bin_num[0]][0])
         if not os.path.isdir(tmp_dir):
@@ -1260,10 +1260,10 @@ class IFUCube(object):
         #     purposes of Z calculations etc.
         if bin_num is None:
             bin_num = self._get_bin_nums()
-        elif bin_num not in self._get_bin_nums():
-            raise ValueError("bin number {} does not exist".format(bin_num))
         elif isinstance(bin_num, (int,float)):
             bin_num = [bin_num]
+        if not np.all(np.in1d(bin_num, self._get_bin_nums())):
+            raise ValueError(">=1 bin numbers given do not exist")
         print("fitting emission lines to {} bins...".format(len(bin_num)))
 
         # multiprocessing params for emission line fitting pool of workers
@@ -1309,10 +1309,10 @@ class IFUCube(object):
         """
         if bin_num is None:
             bin_num = self._get_bin_nums()
-        elif bin_num not in self._get_bin_nums():
-            raise ValueError("Bin number {} does not exist".format(bin_num))
         elif isinstance(bin_num, (int,float)):
             bin_num = [bin_num]
+        if not np.all(np.in1d(bin_num, self._get_bin_nums())):
+            raise ValueError(">=1 bin numbers given do not exist")
 
         n_bins = len(bin_num)
         #FIXME current link between submodel designation and the value
@@ -1380,13 +1380,12 @@ class IFUCube(object):
             The bin numbers to calculate metallicities for (defaults to None, 
             this will fit all bins)
         """
-
         if bin_num is None:
             bin_num = self._get_bin_nums()
-        elif bin_num not in self._get_bin_nums():
-            raise ValueError("bin number {} does not exist".format(bin_num))
         elif isinstance(bin_num, (int,float)):
             bin_num = [bin_num]
+        if not np.all(np.in1d(bin_num, self._get_bin_nums())):
+            raise ValueError(">=1 bin numbers given do not exist")
 
         #FIXME generalise! currently line fluxes are in order of:
         # Ha, Hb, [NII]6548, [NII]6583, [SII]6716, [SII]6731, 
