@@ -6,17 +6,17 @@ wavelength-calibrated) datacube as ingestion. Wavelength scale should be in
 angstroms.
 
 This tutorial will use an example workflow that performs :ref:`stellar
-continuum <cont-fitting>` and :ref:`emission line <emission-fitting>` fitting and
-subsequent :ref:`analysis <analysis>` on a MUSE data cube.
+continuum <cont-fitting>` and :ref:`emission line <emission-fitting>` fitting
+and subsequent :ref:`analysis <analysis>` on a MUSE data cube.
 
 A description of the processes in each step as well as some of the pertinent
 arguments is given below. For a full description of optional arguments and
-their format, see the :ref:`api documentation of the methods <ifuanal-api>` (or type
-``object?`` from within an IPython session to find out about ``object``). All
-pixel-coordinates should be passed to methods as zero-indexed in the order
-``x``, ``y`` (in the FITS standard). Any files produced are defined in this
-tutorial by their `suffix.extension`. The prefix will be that of the cube being analysed
-(minus the filename extension).
+their format, see the :ref:`api documentation of the methods <ifuanal-api>` (or
+type ``object?`` from within an IPython session to find out about
+``object``). All pixel-coordinates should be passed to methods as zero-indexed
+in the order ``x``, ``y`` (in the FITS standard). Any files produced are
+defined in this tutorial by their `suffix.extension`. The prefix will be that
+of the cube being analysed (minus the filename extension). By default, ifuanal will spawn ``min(Ncpu-1, Ncpu*0.9)`` processes for the multiprocessed parts of the analyses where ``Ncpu`` is the number of cpus on the system (this is saved under the attribute :attr:`n_cpu` and can be changed manually).
 
 .. NOTE::
 
@@ -52,14 +52,16 @@ This will initialise the :class:`~ifuanal.MUSECube` class, which does some
 small manipulation to the MUSE FITS file input before ingestion to
 :class:`~ifuanal.IFUCube`, namely:
 
-* Split the MUSE FITS file into its `DATA` and `STAT` extensions.
-* Add a header card `IFU_EBV` specifying the reddening. The argument ``ebv`` can
-  be passed to :class:`~ifuanal.MUSECube` to explicitly set this, otherwise its default value
-  of "IRSA" will contact the Infrared Science Archive to automatically determine
-  it based on the coordinates of the WCS reference pixel of the cube (this
-  requires the optional dependancy :mod:`astroquery` to be installed).
-* Add a header card `IFU_Z` specifying the redshift. In the example case this is
-  `0.008138`
+* Open the MUSE FITS file into a :class:`astropy.io.fits.HDUList` of the
+  PRIMARY, DATA and STAT extensions.
+* Add a PRIMARY header card `IFU_EBV` specifying the reddening. The argument
+  ``ebv`` can be passed to :class:`~ifuanal.MUSECube` to explicitly set this,
+  otherwise its default value of "IRSA" will contact the Infrared Science
+  Archive to automatically determine it based on the coordinates of the WCS
+  reference pixel of the cube (this requires the optional dependancy
+  :mod:`astroquery` to be installed).
+* Add a PRIMARY header card `IFU_Z` specifying the redshift. In the example
+  case this is `0.008138`
 * The MUSE data `STAT` extension gives the variance of the science
   data. ``IFUCube`` wants the standard deviation and so we square root this
   extension.
@@ -407,28 +409,33 @@ results later or elsewhere via pickling (performed with `dill
 <`https://github.com/uqfoundation/dill>`_). ::
 
   >>> cube.save_pkl()
+  writing cube to NGC2906.pkl.fits
   writing to temporary pickle file /cwd/ifuanal_[random].pkl
   moving to NGC2906.pkl
 
 The instance ``cube`` is now stored in `NGC2906.pkl`, including all results of
-fitting, the data and stddev cube etc. This file can then be loaded later to
-resturn to the same state:::
+fitting etc. Since problems can occur with very large pickle files, the cube
+data is stored separately as a FITS file with the extension `.fits` added to
+the pickle filename. This is a dereddened, deredshifted copy of the original
+FITS file we loaded. A FITS file with the specific name `[pkl_filename].fits`
+will be searched for when loading the instance and so a copy should be left
+alongside the pickle file.
+
+The instance can then be loaded later to return tothe same state, by
+specifiying the pickle file to load:::
 
   >>> cube2 = ifuanal.IFUCube.load_pkl("NGC2906.pkl")
   loaded pkl file NGC2906.pkl
 
-And ``cube2`` will have all the attributes of the ``cube`` class: ::
+And ``cube2`` will have all the attributes of the ``cube`` class, e.g.: ::
 
   >>> print cube2.nucleus
   (160.592, 166.442)
 
-.. WARNING::
+.. NOTE::
 
-   This appears to breakdown with large numbers of bins (not sure exactly but
-   >6000). This is probably a filesize issue that may be fixed by saving the
-   altered datacube separately from the pickle file and reingesting it upon load
-   since.
-
+   The attribute :attr:`n_cpu` is updated upon loading an instance to be
+   appropriate for the system being used.
 
 .. _analysis:
 
