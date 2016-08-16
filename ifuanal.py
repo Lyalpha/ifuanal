@@ -71,10 +71,9 @@ class IFUCube(object):
 
     Parameters
     ----------
-    data_cube : :class:`astropy.io.fits.ImageHDU`
-        The data extension of the IFU FITS file.
-    stddev_cube : :class:`astropy.io.fits.ImageHDU`
-        The uncertainty (standard deviation) extension of the IFU FITS file.
+    cube_hdu : :class:`astropy.io.fits.HDUList`
+        A length-3 list of the [primary header, data cube, stddev cube] HDUs
+        of the cube to be analysed.
     base_name : str
         The base name to be used for all output.
     RV : float, optional
@@ -83,25 +82,27 @@ class IFUCube(object):
         The directory containing starlight files and bases. The default
         ``None`` will use the `starlight/` subdirectory.
     """
-    def __init__(self, data_cube, stddev_cube, base_name, RV=3.1, sl_dir=None):
+    def __init__(self, cube_hdu, base_name, RV=3.1, sl_dir=None):
 
-        self.data_cube = data_cube
-        self.stddev_cube = stddev_cube
+        self.prim_cube = cube_hdu[0]
+        self.data_cube = cube_hdu[1]
+        self.stddev_cube = cube_hdu[2]
+
         self.base_name = base_name
 
         self.RV = RV
-        self.data_shape = data_cube.data.shape
-        self.stddev_shape = stddev_cube.shape
+        self.data_shape = self.data_cube.data.shape
+        self.stddev_shape = self.stddev_cube.shape
         if self.data_shape != self.stddev_shape:
             raise ValueError("data_cube and stddev_cube must have same shape!")
         
         # Make a wavelength array and store its units
-        sl = data_cube.header["CRVAL3"] # start lambda
-        rl = data_cube.header["CRPIX3"] # ref pix lambda
-        dl = data_cube.header["CD3_3"] # delta lambda
+        sl = self.data_cube.header["CRVAL3"] # start lambda
+        rl = self.data_cube.header["CRPIX3"] # ref pix lambda
+        dl = self.data_cube.header["CD3_3"] # delta lambda
         self.lamb = sl + (np.arange(self.data_shape[0]) - (rl - 1)) * dl
         self.delta_lamb = dl
-        self.lamb_units = u.Unit(data_cube.header["CUNIT3"])
+        self.lamb_units = u.Unit(self.data_cube.header["CUNIT3"])
 
         if sl_dir is None:
             self.sl_dir = os.path.join(FILEDIR, "starlight")
@@ -133,7 +134,7 @@ class IFUCube(object):
         After correction, the header card `IFU_EBV` is set to zero.
 
         """
-        ebv = self.data_cube.header["IFU_EBV"]
+        ebv = self.prim_cube.header["IFU_EBV"]
         if ebv == 0:
             print("ebv = 0, skipping deredden()")
             return
@@ -146,7 +147,7 @@ class IFUCube(object):
         self.data_cube.data *= corr[:, None, None]
         self.stddev_cube.data *= corr[:, None, None]
         # The cube is now dereddened
-        self.data_cube.header["IFU_EBV"] = 0.
+        self.prim_cube.header["IFU_EBV"] = 0.
 
     def deredshift(self):
         """
@@ -154,7 +155,7 @@ class IFUCube(object):
 
         After correction, the header card `IFU_Z` is set to zero.
         """
-        z = self.data_cube.header["IFU_Z"]
+        z = self.prim_cube.header["IFU_Z"]
         if z == 0:
             print("redshift = 0, skipping deredshift()")
         print("deredshifting from z = {}".format(z))
@@ -170,7 +171,7 @@ class IFUCube(object):
         self.stddev_cube.header["CRPIX3"] /= 1. + z 
         self.stddev_cube.header["CD3_3"]  /= 1. + z
         # The cube is now restframe
-        self.data_cube.header["IFU_Z"] = 0.
+        self.prim_cube.header["IFU_Z"] = 0.
 
     def mask_regions(self, centres, r):
         """
@@ -1616,15 +1617,20 @@ class IFUCube(object):
             cls = IFUCube.__new__(IFUCube)
             with open(pkl_file, "rb") as pkl_data:
                 cls.__dict__ =  pickle.load(pkl_data)
-            # Let's update n_cpu incase we're loading on a different machine
-            cls.n_cpu = int(min(mp.cpu_count()-1,mp.cpu_count()*0.9))
-            return cls
         except IOError:
             raise IOError("Couldn't create instance from pickle file"
                           " {}".format(pkl_file))
+        # Read the cube HDUs from the saved FITS file
+        cube_hdu = fits.open(pkl_file+".fits")
+        cls.__dict__["prim_cube"] = cube_hdu[0]
+        cls.__dict__["data_cube"] = cube_hdu[1]
+        cls.__dict__["stddev_cube"] = cube_hdu[2]
+        # Let's update n_cpu incase we're loading on a different machine
+        cls.n_cpu = int(min(mp.cpu_count()-1,mp.cpu_count()*0.9))
         print("loaded pkl file {}".format(pkl_file))
+        return cls
 
-    def save_pkl(self, pkl_file=None):
+    def save_pkl(self, pkl_file=None, clobber=False):
         """
         Load a previous instance of IFUCube from its pickle file.
 
@@ -1638,22 +1644,41 @@ class IFUCube(object):
         pkl_file : None or str, optional
             The filepath to pickle the instance to. (defaults to ``None``, i.e. 
             will add suffix ".pkl" to original datacube name)
+        clobber : bool, optional
+            Whether to overwrite an existing pkl and FITS file
         """
         if pkl_file is None:
             pkl_file = self.base_name+".pkl"
-        # If the cube was compressed, we can't pickle it so need to rewrite
-        # it to uncompressed format
-        if isinstance(self.data_cube, fits.CompImageHDU):
-            self.data_cube = fits.ImageHDU(self.data_cube.data,
-                                           self.data_cube.header)
-            self.stddev_cube = fits.ImageHDU(self.stddev_cube.data,
-                                            self.stddev_cube.header)
-        # We write to a temporary file for safety - if there's pickling
+
+        try:
+            open(pkl_file)
+            open(pkl_file+".fits")
+        except IOError:
+            pass
+        else:
+            print("One/both of {0} and {0}.fits exist. Use clobber=True to "
+                  "overwrite".format(pkl_file))
+            return
+
+        # Write the cube HDUs to a fits file as they may be large!
+        print("writing cube to {}".format(pkl_file+".fits"))
+        cube_hdu = fits.HDUList([self.prim_cube,
+                                 self.data_cube,
+                                 self.stddev_cube])
+        cube_hdu.writeto(pkl_file+".fits", clobber=True)
+
+        # Remove these entries from the dictionary we want to pickle
+        pkl_dict = {}
+        for key, val in self.__dict__.items():
+            if key not in ["prim_cube", "data_cube", "stddev_cube"]:
+                pkl_dict[key] = val
+
+        # Write to a temporary file for safety - if there's pickling
         # errors, we don't want to overwrite our previous pickle.
         temp = tempfile.mkstemp(prefix="ifuanal_", suffix=".pkl", dir=".")[1]
         print("writing to temporary pickle file {}".format(temp))
         with open(temp, "wb") as output:
-            pickle.dump(self.__dict__, output)
+            pickle.dump(pkl_dict, output)
         print("moving to {}".format(pkl_file))
         shutil.move(temp, pkl_file)
         
@@ -1702,25 +1727,22 @@ class MUSECube(IFUCube):
         base_name = os.path.splitext(muse_cube)[0]
         if base_name.endswith(".fits"):
             # in case original file was, e.g., *.fits.fz
-            base_name = base_name[:-5] 
-        data_cube = cube_hdu[1]
-        stddev_cube = cube_hdu[2]
+            base_name = base_name[:-5]
         # The MUSE STAT cube extension is the variance of the data, we want the
         # standard deviation
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", category=RuntimeWarning)
-            stddev_cube.data = np.sqrt(stddev_cube.data)
+            cube_hdu[2].data = np.sqrt(cube_hdu[2].data)
 
         if ebv == "IRSA":
-            ebv = get_IRSA_ebv(data_cube.header)
-        data_cube.header["IFU_EBV"] = float(ebv)
+            ebv = get_IRSA_ebv(cube_hdu[1].header)
+        cube_hdu[0].header["IFU_EBV"] = float(ebv)
 
         # Add in the redshift of the target since MUSE doesn't have this in the
         # header
-        data_cube.header["IFU_Z"] = float(redshift)
+        cube_hdu[0].header["IFU_Z"] = float(redshift)
 
-        super(MUSECube, self).__init__(data_cube, stddev_cube, base_name, RV,
-                                       sl_dir)
+        super(MUSECube, self).__init__(cube_hdu, base_name, RV, sl_dir)
 
 
 def get_IRSA_ebv(header):
