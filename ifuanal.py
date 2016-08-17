@@ -1658,9 +1658,10 @@ class IFUCube(object):
         except IOError:
             pass
         else:
-            print("One/both of {0} and {0}.fits exist. Use clobber=True to "
-                  "overwrite".format(pkl_file))
-            return
+            if not clobber:
+                print("One/both of {0} and {0}.fits exist. Use clobber=True "
+                      "to overwrite".format(pkl_file))
+                return
 
         # Write the cube HDUs to a fits file as they may be large!
         print("writing cube to {}".format(pkl_file+".fits"))
