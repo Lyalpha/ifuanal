@@ -3,4 +3,3 @@ numpy>=1.10
 scipy>=0.15
 matplotlib>=1.5
 dill>=0.2.5
-pathos>=0.2

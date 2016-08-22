@@ -14,7 +14,6 @@ ifuanal has the following python dependencies:
 * astroquery 0.2.3 (optional: allows automated retrieval of Galactic
   extinction) 
 * dill 0.2.5
-* pathos 0.2
 
 Dependancies can be installed from within a suitable python environment via:::
 
