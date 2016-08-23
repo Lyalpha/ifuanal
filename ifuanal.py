@@ -81,8 +81,11 @@ class IFUCube(object):
     sl_dir : None or str, optional
         The directory containing starlight files and bases. The default
         ``None`` will use the `starlight/` subdirectory.
+    el_json : None or str, optional
+        The filepath of the emission lines json file. If None will use the
+        default located in `data/emission_lines.json`
     """
-    def __init__(self, cube_hdu, base_name, RV=3.1, sl_dir=None):
+    def __init__(self, cube_hdu, base_name, RV=3.1, sl_dir=None, el_json=None):
 
         self.prim_cube = cube_hdu[0]
         self.data_cube = cube_hdu[1]
@@ -111,8 +114,12 @@ class IFUCube(object):
                                  "directory".format(sl_dir))
         else:
             self.sl_dir = sl_dir
-        with open(os.path.join(FILEDIR, "data", "emission_lines.json")) as f:
-            self._emission_lines = json.load(f)
+        if el_json is None:
+            with open(os.path.join(FILEDIR, "data", "emission_lines.json")) \
+                 as f:
+                self._emission_lines = json.load(f)
+        else:
+            self._emission_lines = json.load(el_json)
 
         self.nucleus = None
         self.n_cpu = int(min(mp.cpu_count()-1,mp.cpu_count()*0.9))
@@ -1669,7 +1676,9 @@ class MUSECube(IFUCube):
     sl_dir : None or str, optional
         The directory containing starlight files and bases. The default
         ``None`` will use the `starlight/` subdirectory.
-
+    el_json : None or str, optional
+        The filepath of the emission lines json file. If None will use the
+        default located in `data/emission_lines.json`
 
     References
     ----------
@@ -1677,7 +1686,8 @@ class MUSECube(IFUCube):
        Digital Sky Survey Stellar Spectra and Recalibrating SFD", ApJ, 2011
 
     """
-    def __init__(self, muse_cube, redshift, ebv="IRSA", RV=3.1, sl_dir=None):
+    def __init__(self, muse_cube, redshift, ebv="IRSA", RV=3.1, sl_dir=None,
+                 el_json=None):
         cube_hdu = fits.open(muse_cube)
         base_name = os.path.splitext(muse_cube)[0]
         if base_name.endswith(".fits"):
@@ -1697,7 +1707,7 @@ class MUSECube(IFUCube):
         # header
         cube_hdu[0].header["IFU_Z"] = float(redshift)
 
-        super(MUSECube, self).__init__(cube_hdu, base_name, RV, sl_dir)
+        super(MUSECube, self).__init__(cube_hdu, base_name, RV, sl_dir, el_json)
 
 def _get_emline_model(emlines, res=None):
     """
