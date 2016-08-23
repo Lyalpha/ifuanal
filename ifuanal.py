@@ -1615,16 +1615,20 @@ class IFUCube(object):
             pass
         else:
             if not clobber:
-                print("One/both of {0} and {0}.fits exist. Use clobber=True "
-                      "to overwrite".format(pkl_file))
+                print("{0} and/or {0}.fits exist.".format(pkl_file)))
+                print("Use clobber=True to overwrite")
                 return
 
         # Write the cube HDUs to a fits file as they may be large!
-        print("writing cube to {}".format(pkl_file+".fits"))
+        tempcube = tempfile.mkstemp(prefix="ifuanal_", suffix=".pkl.fits",
+                                    dir=".")[1]
+        print("writing cube to temporary file {}".format(tempcube))
         cube_hdu = fits.HDUList([self.prim_cube,
                                  self.data_cube,
                                  self.stddev_cube])
-        cube_hdu.writeto(pkl_file+".fits", clobber=True)
+        cube_hdu.writeto(tempcube)
+        print("moving to {}".format(pkl_file+".fits"))
+        shutil.move(temp, pkl_file+".fits")
 
         # Remove these entries from the dictionary we want to pickle
         pkl_dict = {}
@@ -1635,7 +1639,7 @@ class IFUCube(object):
         # Write to a temporary file for safety - if there's pickling
         # errors, we don't want to overwrite our previous pickle.
         temp = tempfile.mkstemp(prefix="ifuanal_", suffix=".pkl", dir=".")[1]
-        print("writing to temporary pickle file {}".format(temp))
+        print("writing instance to temporary pickle file {}".format(temp))
         with open(temp, "wb") as output:
             pickle.dump(pkl_dict, output)
         print("moving to {}".format(pkl_file))
