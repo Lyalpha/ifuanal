@@ -48,7 +48,7 @@ SYNTHCOL = "#D95F02" # starlight fit
 MASKCOL = "#7570B3" # masked regions in fit
 CLIPPEDCOL = "red" # clipped by starlight
 ERRCOL = "#666666" # stddev
-ZCOL = np.array(["#1B9E77", "#E7298A", "#a6761d","#66A61E", "#E6AB02", 
+ZCOL = np.array(["#1B9E77", "#E7298A", "#a6761d","#66A61E", "#E6AB02",
                  "#7570B3"]) # metallicities
 
 # Random seed for starlight grid file
@@ -57,7 +57,7 @@ RANDSEED = 999
 REDLAW = "CCM"
 
 # Speed of light in km/s
-ckms = c.to("km/s").value 
+ckms = c.to("km/s").value
 
 # Make plots prettier
 rc('font',**{'family':'serif','serif':['Times New Roman'],'size':14})
@@ -95,7 +95,7 @@ class IFUCube(object):
         self.stddev_shape = self.stddev_cube.shape
         if self.data_shape != self.stddev_shape:
             raise ValueError("data_cube and stddev_cube must have same shape!")
-        
+
         # Make a wavelength array and store its units
         sl = self.data_cube.header["CRVAL3"] # start lambda
         rl = self.data_cube.header["CRPIX3"] # ref pix lambda
@@ -162,8 +162,8 @@ class IFUCube(object):
         self.data_cube.header["CRPIX3"] /= 1. + z # ref pix lambda
         self.data_cube.header["CD3_3"]  /= 1. + z # delta lambda
         # Update stddev header
-        self.stddev_cube.header["CRVAL3"] /= 1. + z 
-        self.stddev_cube.header["CRPIX3"] /= 1. + z 
+        self.stddev_cube.header["CRVAL3"] /= 1. + z
+        self.stddev_cube.header["CRPIX3"] /= 1. + z
         self.stddev_cube.header["CD3_3"]  /= 1. + z
         # The cube is now restframe
         self.prim_cube.header["IFU_Z"] = 0.
@@ -246,7 +246,7 @@ class IFUCube(object):
             raise AttributeError("box must be fully within the image, use "
                                  "box_size=0 to force a location outside "
                                  "the FOV.")
-            return 
+            return
 
         # Find the nearest sampled wavelengths to our limits
         idx_low = np.abs(self.lamb - lamb_low).argmin()
@@ -267,7 +267,7 @@ class IFUCube(object):
         fit_g = fitting.LevMarLSQFitter()
         g = fit_g(g_init, x, y, z)
 
-        self.nucleus = (round(xc-box_size+g.x_mean,3), 
+        self.nucleus = (round(xc-box_size+g.x_mean,3),
                         round(yc-box_size+g.y_mean,3))
         print("found nucleus as {}".format(self.nucleus))
 
@@ -275,22 +275,22 @@ class IFUCube(object):
         if plot:
             plt.close("all")
             plt.figure(figsize=(9.5, 3))
-            for i, vt in enumerate([(z, "datacube"), 
-                                    (g(x,y), "model"), 
+            for i, vt in enumerate([(z, "datacube"),
+                                    (g(x,y), "model"),
                                     (z-g(x,y), "residual")], 1):
                 vals, title = vt
                 plt.subplot(1, 3, i)
-                plt.imshow(vals, origin='lower', interpolation='nearest', 
+                plt.imshow(vals, origin='lower', interpolation='nearest',
                            vmin=np.min(z), vmax=1.)
                 plt.autoscale(False)
                 plt.plot(g.x_mean, g.y_mean, "kx", markersize=10)
                 plt.gca().get_xaxis().set_visible(False)
                 plt.gca().get_yaxis().set_visible(False)
                 plt.title(title)
-            plt.gcf().text(0.5,0.05,"nucleus = "+str(self.nucleus), 
+            plt.gcf().text(0.5,0.05,"nucleus = "+str(self.nucleus),
                            ha="center", va="center")
             plt.savefig(self.base_name+"_nucleus.pdf", bbox_inches="tight")
-       
+
 
     def voronoi_bin(self, target_sn, lamb_low=5590., lamb_upp=5680.,
                     cont_lamb_low=None, cont_lamb_upp=None, clobber=False,
@@ -320,7 +320,7 @@ class IFUCube(object):
             S/N (defaults to ``None``, ``None`` - i.e. no subtraction)
         clobber: bool, optional
             Whether to overwrite an existing output. Searches for the file
-            ``base_name``+`_voronoibins.txt`, if this exists and ``clobber`` = 
+            ``base_name``+`_voronoibins.txt`, if this exists and ``clobber`` =
             ``False`` then just use that.
         min_sn : float, optional
             The minimum S/N of a spaxel to be considered for the algorithm.
@@ -338,7 +338,7 @@ class IFUCube(object):
         ----------
         Uses the algorithm of [CC03]_.
 
-        .. [CC03] Cappellari, M & Copin, Y, "Adaptive spatial binning of 
+        .. [CC03] Cappellari, M & Copin, Y, "Adaptive spatial binning of
            integral-field spectroscopic data using Voronoi tessellations",
            MNRAS, 2003.
 
@@ -355,13 +355,13 @@ class IFUCube(object):
         print("binning spaxels with Voronoi algorithm with "
               "S/N target of {}".format(target_sn))
 
-        if not all((self.lamb[0] < lamb_low < self.lamb[-1], 
+        if not all((self.lamb[0] < lamb_low < self.lamb[-1],
                     self.lamb[0] < lamb_upp < self.lamb[-1])):
             raise ValueError("S/N window not within wavelength range of cube")
         # Find the nearest sampled wavelengths to our limits
         idx_low = np.abs(self.lamb - lamb_low).argmin()
         idx_upp = np.abs(self.lamb - lamb_upp).argmin() + 1
-        
+
         # Sum the data and stddev cubes to get signal and noise while
         # catching the warning when spaxels only have nans
         with warnings.catch_warnings():
@@ -377,19 +377,19 @@ class IFUCube(object):
                                                       :, :], axis=0)
                 signal = signal - cont
 
-        # Get the number of nans per spaxel, if its more than 20% of the 
+        # Get the number of nans per spaxel, if its more than 20% of the
         # wavelength window we take this as a crap spectrum and throw it out
         num_nans = np.sum(np.isnan(self.data_cube.data[idx_low:idx_upp, :, :]),
                           axis=0)
         idx_nans = np.where(num_nans > 0.2 * (idx_upp - idx_low))
         signal[idx_nans] = np.nan
         noise[idx_nans] = np.nan
-        
+
         # Make array to hold x,y coordinates of all spaxels
         xx, yy = np.meshgrid(np.arange(signal.shape[1]),
                              np.arange(signal.shape[0]))
         # Make an array to hold the voronoi input
-        vor_input = np.column_stack((xx.ravel(), yy.ravel(), 
+        vor_input = np.column_stack((xx.ravel(), yy.ravel(),
                                      signal.ravel(), noise.ravel()))
         # Need to clean the input of the bad spectra:
         #  remove those with signal == nan
@@ -603,12 +603,12 @@ class IFUCube(object):
         Creating an SDSS-like  3 arcsec fibre centred on the host:
 
         1. set the nucleus with :meth:`set_nucleus()` (it must be in the FOV)
-        2. determine the ``plate_scale`` of the cube (arcsec/pixel) 
+        2. determine the ``plate_scale`` of the cube (arcsec/pixel)
         3. ``>>> cube.add_custom_bin(cube.nucleus, 3/plate_scale)``
         """
 
-        x_cen, y_cen = centre 
-        y, x = np.ogrid[-y_cen:self.data_shape[1]-y_cen, 
+        x_cen, y_cen = centre
+        y, x = np.ogrid[-y_cen:self.data_shape[1]-y_cen,
                         -x_cen:self.data_shape[2]-x_cen]
         dataidx = np.where(x*x + y*y <= r*r)
 
@@ -681,7 +681,7 @@ class IFUCube(object):
 
         Similar to ``get_single_spectrum`` except ``x`` and ``y`` are arrays.
         The single spectra given by these locations are combined using the
-        weighted mean of the fluxes. Returns array of same form as 
+        weighted mean of the fluxes. Returns array of same form as
         ``get_single_spectrum``.
 
         """
@@ -690,14 +690,14 @@ class IFUCube(object):
         spaxels_flux = self.data_cube.data[:,y,x] # numpy axes switch
         spaxels_stddev = self.stddev_cube.data[:,y,x]
 
-        # Find any wavelengths where we have >75% spaxels as nans 
+        # Find any wavelengths where we have >75% spaxels as nans
         # and flag that wavelength as bad for starlight
         bad_idx = np.isnan(spaxels_flux) | np.isnan(spaxels_stddev)
         num_bad = np.sum(bad_idx, axis=1)
         bad_lamb = num_bad > 0.75 * x.size
 
-        # Array to hold final weighted-mean spectrum - same format 
-        # as get_single_spectrum() 
+        # Array to hold final weighted-mean spectrum - same format
+        # as get_single_spectrum()
         spec = np.empty((self.lamb.size, 4))
         spec[:,0] = self.lamb
         # Use masked arrays to cover the nans while preserving shape
@@ -743,31 +743,31 @@ class IFUCube(object):
 
 
 
-    def run_starlight(self, bin_num=None, base_name="bc03", lamb_low=5590., 
+    def run_starlight(self, bin_num=None, base_name="bc03", lamb_low=5590.,
                       lamb_upp=5680., use_tmp_dir=None, clobber=False,
                       append=False):
         """
         Run the starlight fitting of spectra in the cube.
-        
+
         This method will create a file with the suffix `_sloutputs.txt` which
         gives the bin numbers and their corresponding starlight output files.
         If a run has been previously performed, the contents of this file can
         be read - however the files containing the starlight output must
         also exist.
-        
+
         Parameters
         ----------
         bin_num : (None, int or array_like), optional
             The bin numbers to fit with starlight (defaults to None, this will
             fit all bins).
         base_name : str
-            The name of the bases to use for starlight fitting. There must 
+            The name of the bases to use for starlight fitting. There must
             exist a valid starlight bases file (see starlight docs) named
             "starlight/``base_name``.base" (defaults to "bc03").
         lamb_low, lamb_upp : float, optional
-            The wavelength limits over which starlight will calculate the S/N. 
+            The wavelength limits over which starlight will calculate the S/N.
             This isn't actually used since we have a stddev cube but the limits
-            must be within the wavelengh range of the cube anyway (defaults 
+            must be within the wavelengh range of the cube anyway (defaults
             to 5590.->5680.).
         use_tmp_dir: None or str, optional
             The temporary directory where the resampled bases and output will
@@ -821,7 +821,7 @@ class IFUCube(object):
             print("using STARLIGHT tmp directory {}".format(sl_tmp_dir))
         else:
             # We need to copy everything to a temporary folder since
-            # starlight has filepath character length issues, plus 
+            # starlight has filepath character length issues, plus
             # then it doesn't clog up cwd.
             # Make a safe temporary directory to hold everything
             sl_tmp_dir = os.path.join(tempfile.mkdtemp(prefix="starlight_"),"")
@@ -830,7 +830,7 @@ class IFUCube(object):
             # Copy over the bases and resample them to that of our data
             bases_tmp_dir = os.path.join(sl_tmp_dir, base_name)
             # Because shutil.copytree requires `dst` doesn't exist:
-            shutil.rmtree(sl_tmp_dir) 
+            shutil.rmtree(sl_tmp_dir)
             shutil.copytree(self.sl_dir, sl_tmp_dir)
             d = os.path.join(sl_tmp_dir, base_name)
             basefiles = [os.path.join(d, f) for f in os.listdir(d)]
@@ -851,7 +851,7 @@ class IFUCube(object):
         print()
         # multiprocessing params for starlight pool of workers
         p = mp.Pool(self.n_cpu)
-        bin_out_files = p.map(fit_starlight, 
+        bin_out_files = p.map(fit_starlight,
                               zip(bin_num,
                                   spec_files,
                                   repeat(self.lamb),
@@ -861,7 +861,7 @@ class IFUCube(object):
                                   repeat(lamb_low),
                                   repeat(lamb_upp)))
         p.close()
-        p.join()    
+        p.join()
         print("STARLIGHT fits of {} bins complete".format(len(bin_num)))
 
         #TODO
@@ -884,7 +884,7 @@ class IFUCube(object):
 
         The ``results`` dictionary is created by parsing the starlight output
         files (see ``run_starlight``) and copying other properties (e.g.
-        ``nucleus``). The dictionary is pickled to file with suffix 
+        ``nucleus``). The dictionary is pickled to file with suffix
         `_results.pkl`.
 
         Parameters
@@ -920,7 +920,7 @@ class IFUCube(object):
         self.results["bin"] = dict.fromkeys(bin_num)
         n_bins = len(bin_num)
         for i, bn in enumerate(bin_num, 1):
-            print("parsing starlight output {:5}/{:5}".format(i, n_bins), 
+            print("parsing starlight output {:5}/{:5}".format(i, n_bins),
                   end="\r")
             if self.sl_output[bn][0] is not None:
                 self.results["bin"][bn] = parse_starlight(self.sl_output[bn][0])
@@ -940,7 +940,7 @@ class IFUCube(object):
                 self.results["bin"][bn]["y_bar"] = y_bar
                 if self.nucleus is not None:
                     nx, ny = self.nucleus[0], self.nucleus[1]
-                    distances = ((x_spax - nx)**2 
+                    distances = ((x_spax - nx)**2
                                  + (y_spax - ny)**2)**0.5
                     self.results["bin"][bn]["dist_min"] = np.min(distances)
                     self.results["bin"][bn]["dist_max"] = np.max(distances)
@@ -966,11 +966,11 @@ class IFUCube(object):
 
         # Get the data we want to plot:
         lamb = res["sl_spec"][:,0]
-        obs = np.ma.masked_array(res["sl_spec"][:,1], 
+        obs = np.ma.masked_array(res["sl_spec"][:,1],
                                  mask=res["sl_spec"][:,1] < 0)
         syn = res["sl_spec"][:,2]
         resid = obs - syn
-        err = np.ma.masked_array(1/res["sl_spec"][:,3], 
+        err = np.ma.masked_array(1/res["sl_spec"][:,3],
                                  mask=res["sl_spec"][:,3] < 0)
         masked = np.ma.masked_array(resid, mask=res["sl_spec"][:,3] == 0)
         slice_idxs = [(s.start,s.stop-1) for s in np.ma.clump_masked(masked)]
@@ -1073,11 +1073,11 @@ class IFUCube(object):
 
         """
         d = self.results["bin"]
-        worst_sl_bins = sorted(d.iterkeys(), 
+        worst_sl_bins = sorted(d.iterkeys(),
                                key=(lambda key:
                                     d[key]["chi2/Nl_eff"]))[-N:]
         print("worst continuum fitted bins: {}".format(worst_sl_bins))
-        worst_el_bins = sorted(d.iterkeys(), 
+        worst_el_bins = sorted(d.iterkeys(),
                                key=(lambda key:
                                     d[key]["emline_res"]["chi2dof"]))[-N:]
         print("worst emission line fitted bins: {}".format(worst_el_bins))
@@ -1092,15 +1092,15 @@ class IFUCube(object):
         Plot the contribution of the young, intermediate and old stellar
         populations.
 
-        The plotted values are based on the light fraction results of the 
+        The plotted values are based on the light fraction results of the
         starlight continuum fitting. Nan or negative values are shown as white.
         The plot is saved with suffix `_yio.pdf`.
 
         Parameters
         ----------
         age1, age2: int, optional
-            The dividing ages in years between the young (<= ``age1``), 
-            intermediate (between ``age1`` and ``age2``) and old (>= ``age2``) 
+            The dividing ages in years between the young (<= ``age1``),
+            intermediate (between ``age1`` and ``age2``) and old (>= ``age2``)
             stellar components.
         """
 
@@ -1117,7 +1117,7 @@ class IFUCube(object):
             intidx = (age1 < r["bases"][:,4]) & (r["bases"][:,4] < age2)
             oldidx = r["bases"][:,4] >= age2
             ynglightfrac = np.sum(r["bases"][yngidx,1])
-            intlightfrac = np.sum(r["bases"][intidx,1]) 
+            intlightfrac = np.sum(r["bases"][intidx,1])
             oldlightfrac = np.sum(r["bases"][oldidx,1])
             young[r["y_spax"],r["x_spax"]] = ynglightfrac
             inter[r["y_spax"],r["x_spax"]] = intlightfrac
@@ -1131,7 +1131,7 @@ class IFUCube(object):
         plt.plot(self.nucleus[0], self.nucleus[1], "kx", markersize=10)
         plt.title("Age$_\\star <$ {}".format(age1_str))
         plt.colorbar(label="x$_\\textrm{j}$ [\%]")
-        
+
 
         axinter = plt.subplot(312, sharex=axyoung, sharey=axyoung,
                               adjustable="box-forced")
@@ -1155,21 +1155,21 @@ class IFUCube(object):
         fig.set_size_inches(5.,15.)
 
         plt.savefig(self.base_name+"_yio.pdf", bbox_inches="tight")
-        print("plot saved to {}".format(self.base_name+"_yio.pdf"))    
+        print("plot saved to {}".format(self.base_name+"_yio.pdf"))
 
     def plot_kinematics(self, norm_v0=0):
         """
         Plot the kinematics of the host.
 
         The plotted values are based on the velocity offset and dispersion
-        results of the starlight continuum fitting. Nan or negative values are 
+        results of the starlight continuum fitting. Nan or negative values are
         shown as white. The plot is saved with suffix `_kinematics.pdf`.
 
         Parameters
         ----------
         norm_v0: float or str, optional
             The zero-point of the velocity distribution (i.e. the plotted
-            values will be v0 - norm_v0). The special case "nucleus" will set 
+            values will be v0 - norm_v0). The special case "nucleus" will set
             the zero-point as the value of the nucelus bin.
         """
 
@@ -1203,7 +1203,7 @@ class IFUCube(object):
         ax2 = plt.subplot(122, sharex=ax1, sharey=ax1, adjustable="box-forced")
         plt.imshow(vd, origin="lower", interpolation="none", cmap="afmhot_r")
         plt.colorbar(label="$\\sigma_\\star$ [km~s$^{-1}$]",
-                     orientation="horizontal").ax.tick_params(labelsize=10)  
+                     orientation="horizontal").ax.tick_params(labelsize=10)
         ax2.autoscale(False)
         plt.plot(self.nucleus[0], self.nucleus[1], "kx", markersize=10)
 
@@ -1219,10 +1219,10 @@ class IFUCube(object):
 
         Based on the contents of `data/emission_lines.json` (NOT AMENDABLE AT
         PRESENT!), a series of gaussians will be fit to those emission lines.
-        The fitting is performed in a brute force manner over a range of 
-        initial guesses to attempt to find the global minimum. As such, 
-        increasing the length of the initial guesses for the width, mean and 
-        amplitude (``vd_init``, ``v0_init`` and ``amp_init`` respectively) will 
+        The fitting is performed in a brute force manner over a range of
+        initial guesses to attempt to find the global minimum. As such,
+        increasing the length of the initial guesses for the width, mean and
+        amplitude (``vd_init``, ``v0_init`` and ``amp_init`` respectively) will
         dramatically increase computing time.
 
         Parameters
@@ -1231,7 +1231,7 @@ class IFUCube(object):
             The bin numbers to fit (defaults to None, this will
             fit all bins)
         vd_init : list
-            The intial guess(es) for the velocity dispersion of the lines in 
+            The intial guess(es) for the velocity dispersion of the lines in
             km/s. If None will use initial guesses of 10, 40, 70 and 100 km/s.
         v0_init : list or "vstar"
             The intial guess(es) for the velocity offset of the lines in
@@ -1240,7 +1240,7 @@ class IFUCube(object):
             +/-200 km/s of that value, but limited to within ``offset_bounds``
             of zero offset.
         amp_init : list
-            The initial guess(es) for the amplitudes of the lines in units of 
+            The initial guess(es) for the amplitudes of the lines in units of
             ``fobs_norm`` (see starlight manual).
         stddev_bounds : list
             Bounding limits for the sigma widths of the lines in km/s.
@@ -1263,7 +1263,7 @@ class IFUCube(object):
 
         # multiprocessing params for emission line fitting pool of workers
         p = mp.Pool(self.n_cpu)
-        emline_results = p.map(fit_emission_lines, 
+        emline_results = p.map(fit_emission_lines,
                                zip(bin_num,
                                    [self.results["bin"][bn] for bn in bin_num],
                                    repeat(self.emission_lines),
@@ -1287,12 +1287,12 @@ class IFUCube(object):
 
         The values are calculated for each bin in ``bin_num`` and are based
         on the emission line models produced by run_emission_line(). Follows
-        the formal definintion of emission=negative_ew, absoption=positive_ew). 
+        the formal definintion of emission=negative_ew, absoption=positive_ew).
 
         Parameters
         ----------
         bin_num : (None, int or array_like), optional
-            The bin numbers to get equivalent widths for (defaults to None, 
+            The bin numbers to get equivalent widths for (defaults to None,
             this will fit all bins)
         """
         if bin_num is None:
@@ -1600,7 +1600,7 @@ class IFUCube(object):
         Parameters
         ----------
         pkl_file : None or str, optional
-            The filepath to pickle the instance to. (defaults to ``None``, i.e. 
+            The filepath to pickle the instance to. (defaults to ``None``, i.e.
             will add suffix ".pkl" to original datacube name)
         clobber : bool, optional
             Whether to overwrite an existing pkl and FITS file
@@ -1641,7 +1641,7 @@ class IFUCube(object):
         print("moving to {}".format(pkl_file))
         shutil.move(temp, pkl_file)
 
-                
+
 class MUSECube(IFUCube):
     """
     A Child class of :class:`~ifuanal.IFUCube` tailored for MUSE data cubes.
@@ -1780,9 +1780,9 @@ def get_Alamb(lamb, ebv, RV=3.1, lamb_unit=u.Unit("angstrom")):
     y = x[nuv2] - 5.9
     Fa = -0.04473 * y**2 - 0.009779 * y**3
     Fb = -0.2130 * y**2 - 0.1207 * y**3
-    a[nuv2] = (1.752 - 0.316 * x[nuv2] - 0.104 
+    a[nuv2] = (1.752 - 0.316 * x[nuv2] - 0.104
                / ((x[nuv2] - 4.67)**2 + 0.341) + Fa)
-    b[nuv2] = (-3.09 + 1.825 * x[nuv2] + 1.206 
+    b[nuv2] = (-3.09 + 1.825 * x[nuv2] + 1.206
                / ((x[nuv2] - 4.62)**2 + 0.263) + Fb)
 
     AV = RV * ebv
@@ -1895,7 +1895,7 @@ def fit_starlight(fargs):
     sys.stdout.flush()
     out_file = os.path.basename(spec_file)+"_out"
     # Write a grid file for starlight (see manual)
-    with tempfile.NamedTemporaryFile(prefix="grid_", dir=tmp_dir, 
+    with tempfile.NamedTemporaryFile(prefix="grid_", dir=tmp_dir,
                                      delete=False) as grid_file:
         # we need to specifically set the precision and manually calculate the
         # wavelength window for starlight to model - in some cases the rounding
@@ -1904,15 +1904,15 @@ def fit_starlight(fargs):
         lamb_syn_ini = round(lamb[0],8)
         lamb_syn_fin = lamb_syn_ini + (len(lamb) - 1) * delta_lamb_syn
         # the header
-        grid_file.write("\n".join(["1", os.path.join(tmp_dir,bases,""), 
-                                   tmp_dir, tmp_dir, tmp_dir, str(RANDSEED), 
+        grid_file.write("\n".join(["1", os.path.join(tmp_dir,bases,""),
+                                   tmp_dir, tmp_dir, tmp_dir, str(RANDSEED),
                                    str(low_sn), str(upp_sn), str(lamb_syn_ini),
                                    str(lamb_syn_fin), str(delta_lamb_syn),
                                    "1.0", "FIT", "1", "1"])+"\n")
         # a line describing this fit containing obs_file config base mask
         # red_law v0 vd out_file
-        grid_file.write(" ".join([os.path.basename(spec_file), 
-                                  "starlight.config", bases+".base", 
+        grid_file.write(" ".join([os.path.basename(spec_file),
+                                  "starlight.config", bases+".base",
                                   "starlight.mask", REDLAW, "0.0", "150.0",
                                   out_file])+"\n")
 
@@ -1926,7 +1926,7 @@ def fit_starlight(fargs):
         open(out_file_path)
     except IOError:
         out_file = None
-    else: 
+    else:
         out_file = out_file_path
     return bin_num, out_file, spec_file
 
@@ -1985,13 +1985,13 @@ def fit_emission_lines(fargs):
     if v0_init == "vstar":
         offset_low = 1 + max((bin_res["v0_min"]-200), off_b[0])/ckms
         offset_high = 1 + min((bin_res["v0_min"]+200), off_b[1])/ckms
-        offset_init = np.linspace(offset_low, offset_high, 6) 
+        offset_init = np.linspace(offset_low, offset_high, 6)
     else:
         offset_init = 1 + np.array(np.array(v0_init)/ckms)
     stddev_init = np.asarray(np.array(vd_init)/ckms)
 
     # Make combinations of all parameter initial guesses.
-    param_comb = list(product(amp_init, offset_init, stddev_init)) 
+    param_comb = list(product(amp_init, offset_init, stddev_init))
     Ncomb = len(param_comb)
     dof = len(fitting._model_to_fit_params(el_init)[0])
     chi2dof = 1e50
@@ -2009,9 +2009,9 @@ def fit_emission_lines(fargs):
         levmar_fitter = fitting.LevMarLSQFitter()
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            el_fit = levmar_fitter(el_init, el_spec[:,0], 
+            el_fit = levmar_fitter(el_init, el_spec[:,0],
                                    el_spec[:,1]-el_spec[:,2],
-                                   weights = el_spec[:,3], 
+                                   weights = el_spec[:,3],
                                    maxiter=3000)
         diff = (el_spec[:,1] - el_spec[:,2]) - el_fit(el_spec[:,0])
         _chi2 = np.nansum((diff * el_spec[:,3])**2)
@@ -2070,10 +2070,10 @@ def parse_starlight(sl_output):
         return None
     results_dict["sl_spec"] = np.genfromtxt(sl_output, skip_header=spec_line)
     results_dict["bases"] = np.genfromtxt(sl_output, skip_header=base_line,
-                                          max_rows=results_dict["N_base"], 
+                                          max_rows=results_dict["N_base"],
                                           usecols=(0,1,2,3,4,5,6,8))
     return results_dict
-         
+
 
 def _model_to_res_dict(model, el, fobs_norm=1):
     """
@@ -2133,7 +2133,7 @@ def _model_to_res_dict(model, el, fobs_norm=1):
         sm_res["rest_lambda"] = el[e][n]
 
     return res
-  
+
 
 def shiftedColorMap(cmap, start=0, midpoint=0.5, stop=1.0, name="shiftedcmap"):
     """
@@ -2145,7 +2145,7 @@ def shiftedColorMap(cmap, start=0, midpoint=0.5, stop=1.0, name="shiftedcmap"):
     ----------
     cmap : matplotlib.cm
         The matplotlib colormap to be altered
-    start : float 
+    start : float
         Offset from lowest point in the colormap's range. Should be between 0.0
         and ``midpoint``.
     midpoint : float
@@ -2170,7 +2170,7 @@ def shiftedColorMap(cmap, start=0, midpoint=0.5, stop=1.0, name="shiftedcmap"):
 
     # shifted index to match the data
     shift_index = np.hstack([
-        np.linspace(0.0, midpoint, 128, endpoint=False), 
+        np.linspace(0.0, midpoint, 128, endpoint=False),
         np.linspace(midpoint, 1.0, 129, endpoint=True)
     ])
 
@@ -2185,7 +2185,7 @@ def shiftedColorMap(cmap, start=0, midpoint=0.5, stop=1.0, name="shiftedcmap"):
     newcmap = colors.LinearSegmentedColormap(name, cdict)
     plt.register_cmap(cmap=newcmap)
 
-    return newcmap     
+    return newcmap
 
 if __name__ == "__main__":
     pass
