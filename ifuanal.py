@@ -654,8 +654,15 @@ class IFUCube(object):
         print("didn't find a bin at location {}, {}".format(x,y))
         return None
 
-    def _get_bin_nums(self):
-        return sorted(self.bin_nums.keys())
+    def _get_bin_nums(self, custom=False):
+        """
+        Return a sorted list of all bin nums or, if custom==True, return
+        a tuple of (bin nums, number of custom bins)
+        """
+        bin_nums = np.sort(self.bin_nums.keys())
+        if custom:
+            return (bin_nums, np.sum(bin_nums < 0))
+        return bin_nums
 
     def get_single_spectrum(self, x, y):
         """
