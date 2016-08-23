@@ -23,10 +23,12 @@ type ``object?`` from within an IPython session to find out about
   multiprocessed parts of the analyses where ``Ncpu`` is the number of cpus on
   the system (this is saved under the attribute :attr:`n_cpu` and can be changed
   manually).
-* Emission lines to fit are defined in the file `data/emissionlines.json`. The
-  existing entries should not be altered, however additional lines may be added.
-  No sanity checking of these entries is done, so make sure they are sensible
-  for the data being analysed (i.e. within the wavelength window of the cube).
+* Emission lines to fit are defined in the file `data/emissionlines.json`.
+  Additional lines can be fit for by copying this file and manually adding new
+  entries, and giving the filepath of this new file via the ``el_json``
+  argument. Existing lines should not be altered. No sanity checking of the
+  lines is done, so make sure they are sensible for the data being analysed
+  (i.e. within the wavelength window of the cube).
 
 .. NOTE::
 

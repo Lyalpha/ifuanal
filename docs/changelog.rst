@@ -1,6 +1,11 @@
 Changelog
 =========
 
+vdev
+----
+ * Exposed the filepath of the json emission lines file via the ``el_json``
+   argument to :class:`~ifuanal.IFUCube` and :class:`~ifuanal.MUSECube`.
+
 v0.3.0
 ------
  * Overhauled behind-the-scenes in emission line fitting to make more general
