@@ -112,7 +112,7 @@ class IFUCube(object):
         else:
             self.sl_dir = sl_dir
         with open(os.path.join(FILEDIR, "data", "emission_lines.json")) as f:
-            self.emission_lines = json.load(f)
+            self._emission_lines = json.load(f)
 
         self.nucleus = None
         self.n_cpu = int(min(mp.cpu_count()-1,mp.cpu_count()*0.9))
@@ -1266,7 +1266,7 @@ class IFUCube(object):
         emline_results = p.map(fit_emission_lines,
                                zip(bin_num,
                                    [self.results["bin"][bn] for bn in bin_num],
-                                   repeat(self.emission_lines),
+                                   repeat(self._emission_lines),
                                    repeat(vd_init),
                                    repeat(v0_init),
                                    repeat(amp_init),
@@ -1382,7 +1382,7 @@ class IFUCube(object):
                                          bin_res["sl_spec"][:,2]) *
                                         bin_res["fobs_norm"], mask=mask)
         emline_uncert = np.ma.masked_array(bin_res["spec"][:,2], mask=mask)
-        emline_model = _get_emline_model(self.emission_lines,
+        emline_model = _get_emline_model(self._emission_lines,
                                          bin_res["emline_res"])
 
         plt.close("all")
