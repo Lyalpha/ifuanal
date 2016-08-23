@@ -1,8 +1,8 @@
 Changelog
 =========
 
-dev
----
+v0.3.0
+------
  * Overhauled behind-the-scenes in emission line fitting to make more general
    for custom line additions:
 
