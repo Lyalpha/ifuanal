@@ -2,8 +2,7 @@ Tutorial
 ========
 
 ifuanal requires a reduced (i.e. sky-subtracted, flux- and
-wavelength-calibrated) datacube as ingestion. Wavelength scale should be in
-angstroms.
+wavelength-calibrated) datacube as ingestion.
 
 This tutorial will use an example workflow that performs :ref:`stellar
 continuum <cont-fitting>` and :ref:`emission line <emission-fitting>` fitting
@@ -13,10 +12,21 @@ A description of the processes in each step as well as some of the pertinent
 arguments is given below. For a full description of optional arguments and
 their format, see the :ref:`api documentation of the methods <ifuanal-api>` (or
 type ``object?`` from within an IPython session to find out about
-``object``). All pixel-coordinates should be passed to methods as zero-indexed
-in the order ``x``, ``y`` (in the FITS standard). Any files produced are
-defined in this tutorial by their `suffix.extension`. The prefix will be that
-of the cube being analysed (minus the filename extension). By default, ifuanal will spawn ``min(Ncpu-1, Ncpu*0.9)`` processes for the multiprocessed parts of the analyses where ``Ncpu`` is the number of cpus on the system (this is saved under the attribute :attr:`n_cpu` and can be changed manually).
+``object``).
+
+* All pixel-coordinates should be passed to methods as zero-indexed in the order
+  ``x``, ``y`` (in the FITS standard).
+* Any files produced are defined in this tutorial by their
+  `suffix.extension`. The prefix will be that of the cube being analysed (minus
+  the filename extension).
+* By default, ifuanal will spawn ``min(Ncpu-1, Ncpu*0.9)`` processes for the
+  multiprocessed parts of the analyses where ``Ncpu`` is the number of cpus on
+  the system (this is saved under the attribute :attr:`n_cpu` and can be changed
+  manually).
+* Emission lines to fit are defined in the file `data/emissionlines.json`. The
+  existing entries should not be altered, however additional lines may be added.
+  No sanity checking of these entries is done, so make sure they are sensible
+  for the data being analysed (i.e. within the wavelength window of the cube).
 
 .. NOTE::
 
@@ -31,7 +41,7 @@ of the cube being analysed (minus the filename extension). By default, ifuanal w
 .. NOTE::
 
    In this tutorial, the markup of different objects are as follows:
-   
+
    * :class:`Class_Name`
    * :attr:`class_attribute`
    * :meth:`class_method`
@@ -45,7 +55,7 @@ For this example MUSE science verification data of the target **NGC2906** will b
 
 ::
 
-  >>> import ifuanal 
+  >>> import ifuanal
   >>> cube = ifuanal.MUSECube("NGC2906.fits", 0.008138)
 
 This will initialise the :class:`~ifuanal.MUSECube` class, which does some
@@ -68,14 +78,7 @@ small manipulation to the MUSE FITS file input before ingestion to
 
 ``IFUCube`` is then initialised which will set up the wavelength scale, check
 the STARLIGHT directory (:attr:`sl_dir`) exists, and load the emission line data
-from `data/emission_lines.json`
-
-.. WARNING::
-
-   The lines in `data/emission_lines.json` should not be altered in the current
-   version. There are some hard coded sections that require these and only these
-   lines. A generalising of this process will allow custom line lists to be
-   given.
+from `data/emission_lines.json`.
 
 .. _deredden-deredshift:
 
@@ -176,8 +179,9 @@ appear as a ``dict`` of the form: ::
 
   >>> cube.bin_nums
   {0: {'mean': (x_mean, y_mean),
-  'spax': (x_spax, y_spax)},
-   1 ...
+       'spax': (x_spax, y_spax)},
+   1: { ... }
+   ...
   }
 
 The entry ``mean`` gives the centre of the bin (for Vornoi binning this is the
@@ -228,7 +232,7 @@ implementation, to grow bins around peaks in the emission line flux. ::
   ... max_radius=5, min_flux=600)
 
 A description of these required arguments is available in the documentation for
-:meth:`~ifuanal.IFUCube.emission_line_bin`. These will have to be tailored to 
+:meth:`~ifuanal.IFUCube.emission_line_bin`. These will have to be tailored to
 each data cube. Although usually the binning will be done for the
 H\ :math:`\alpha` line, any line or wavelength can be chosen via the
 ``line_lamb`` argument.
@@ -286,7 +290,7 @@ Stellar continuum fitting
 -------------------------
 
 Stellar continuum fitting is performed via `STARLIGHT
-<http://astro.ufsc.br/starlight/>`_ (see :ref:`starlight-install`). 
+<http://astro.ufsc.br/starlight/>`_ (see :ref:`starlight-install`).
 
 **The tl;dr version:** ::
 
@@ -359,8 +363,8 @@ the lines given in `data/emission_lines.json`.
 
   >>> cube.run_emission_lines()
   ... [emission lines output] ...
-  >>> cube.get_emission_line_fluxes()
-  >>> cube.get_emission_line_metallicities()
+  >>> cube.parse_emission()
+  ... [parsing output] ...
 
 **Extended version:**
 
@@ -368,20 +372,24 @@ The emission line model is formed from the addition of gaussians via
 `astropy\'s compound models
 <http://docs.astropy.org/en/stable/modeling/compound-models.html>`_ and is fit
 using a `Levenberg-Marquardt LSQ fitter
-<http://docs.astropy.org/en/stable/api/astropy.modeling.fitting.LevMarLSQFitter.html#astropy.modeling.fitting.LevMarLSQFitter>`_.
+<http://docs.astropy.org/en/stable/api/astropy.modeling.fitting.LevMarLSQFitter.html#astropy.modeling.fitting.LevMarLSQFitter>`_. This
+is constructed based on `data/emission_lines.json`.
 
 As with the :ref:`continuum fitting <cont-fitting>`, by default all bins (that
 have a valid STARLIGHT output) are fit, or a list of specific bins to be fit
 can be passed as ``bin_num``.
 
 Especially with lower SNR features, the fitter is suceptible to finding local
-minima in the LSQ sense and is very sensitive to the inital guess for the
+minima in the LSQ sense and is sensitive to the inital guess for the
 amplitude, mean and standard deviation of the gaussians. To circumvent this a
-somewhat brute force method is overlaid on the minimisation of the fitter, as
+somewhat brute force method is overlaid on the fitter minimisation, as
 well as applying some conditions to the fitted parameters:
 
-* A grid of initial guesses with every combination of the initial guess lists is formed:
-  * The arguments ``vd_init``, ``v0_init`` and ``amp_init`` are the
+* The input observed spectrum is masked for wavelengths more than ``offset_bounds``
+  + 3 :math:`\times` ``stddev_bounds`` from an emission line rest wavelength.
+  Wavelengths outside these windows are not fit for.
+* A grid of initial guesses with every combination of the initial guess lists
+  is formed. The arguments ``vd_init``, ``v0_init`` and ``amp_init`` are the
   initial guesses for the standard deviation (in km/s), mean offset (in km/s)
   and amplitude (in units of ``fobs_norm`` -- see STARLIGHT). See the docs
   for :meth:`~ifuanal.IFUCube.run_emission_lines` for more information.
@@ -397,7 +405,11 @@ well as applying some conditions to the fitted parameters:
 * If any negative amplitude is found, it is set to zero (since we are dealing
   only with emission lines currently).
 
-Each of the initial guess combinations in the grid is fitted with the fitter and the :math:`\chi^2`/dof value of the fit stored; the minimum :math:`\chi^2`/dof is taken as the best fit.
+Each of the initial guess combinations in the grid is fitted with the fitter
+and the :math:`\chi^2`/dof value of the fit stored; the minimum
+:math:`\chi^2`/dof is taken as the best fit.
+
+Parameters and their uncertainties are stored within the :ref:`results-dict`.
 
 .. _saving-loading:
 
@@ -447,10 +459,10 @@ can do all this fancy stuff...
 
 .. _results-dict:
 
-:attr:`results` dictionary
+the :attr:`results` dictionary
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 As an example, to see the results for a bin of number
-``bn``, type:::
+``bn``, type: ::
 
   >>> cube.results["bin"][bn]
   ... [bin results output] ...
@@ -461,15 +473,42 @@ The ``results`` dictionary contains
    Write this section.
 
 
-Plotting
+plotting
 ^^^^^^^^
 
-Once all fitting has been done, maps of the bins with various quantities can be
-output...
+Once all fitting has been done, maps of the bins and the results of the fitting
+methods can be made.See the docs for each method for more info.
 
-.. TODO::
-   Write this section.
+:meth:`~ifuanal.IFUCube.plot_continuum`
+"""""""""""""""""""""""""""""""""""""""
+plots the spectra of a bin and the fit to the continuum, as well as the contribution
+of the various age and metallicity bases to the integrated fit.
 
-.. Warning:: 
-   Plotting will fail if use more than 6 metallicities are used in the
-   STARLIGHT bases, or if the number of ages for each metallicity are different.
+:meth:`~ifuanal.IFUCube.plot_continuum`
+"""""""""""""""""""""""""""""""""""""""
+plots the spectra of a bin and the fit to the emission spectrum.
+
+:meth:`~ifuanal.IFUCube.plot_worst_fits`
+""""""""""""""""""""""""""""""""""""""""
+plots the ``N`` worst fits of each of the continuum and emission fits, as
+determined by their :math:`\chi^2`/dof.
+
+:meth:`~ifuanal.IFUCube.plot_yio`
+"""""""""""""""""""""""""""""""""
+plots the contribution of young, intermediate, and old stellar populations to
+the continuum fits as a map.
+
+:meth:`~ifuanal.IFUCube.plot_kinematics`
+""""""""""""""""""""""""""""""""""""""""
+plots the velocity offset and dispersion of the stellar populations in the
+the continuum fits as a map.
+
+:meth:`~ifuanal.IFUCube.plot_metallicity`
+"""""""""""""""""""""""""""""""""""""""""
+plots the metallicity for the chosen indicator as a map aslongside the cumulative
+metallicity of the bins and a radial dependancy plot.
+
+.. Warning::
+   :meth:`~ifuanal.IFUCube.plot_continuum` will fail if use more than
+   6 metallicities are used in the STARLIGHT bases, or if the number of ages
+   for each metallicity are different.
