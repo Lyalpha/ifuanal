@@ -5,7 +5,7 @@ For the analysis of IFU data cubes.
 """
 from __future__ import print_function
 
-__version__ = "0.2.0dev"
+__version__ = "0.3.0"
 __author__ = "J. Lyman"
 
 
@@ -1615,7 +1615,7 @@ class IFUCube(object):
             pass
         else:
             if not clobber:
-                print("{0} and/or {0}.fits exist.".format(pkl_file)))
+                print("{0} and/or {0}.fits exist.".format(pkl_file))
                 print("Use clobber=True to overwrite")
                 return
 
@@ -1628,7 +1628,7 @@ class IFUCube(object):
                                  self.stddev_cube])
         cube_hdu.writeto(tempcube)
         print("moving to {}".format(pkl_file+".fits"))
-        shutil.move(temp, pkl_file+".fits")
+        shutil.move(tempcube, pkl_file+".fits")
 
         # Remove these entries from the dictionary we want to pickle
         pkl_dict = {}
