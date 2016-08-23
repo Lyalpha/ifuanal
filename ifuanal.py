@@ -36,7 +36,7 @@ from scipy import ndimage
 
 from voronoi import voronoi
 import dill as pickle
-import pathos.multiprocessing as mp
+import multiprocessing as mp
 
 # The file and directory path to this script
 FILEPATH = os.path.realpath(__file__)
@@ -119,12 +119,7 @@ class IFUCube(object):
 
         self.sl_output = {} # dictionary of {[bin number]: ["starlight
                             # outfile", "spec infile",}
-        self.emline_output = {} # dictionary of {[bin number]: [emline_model,
-                                # emline_model chi2dof, good/bad fit]}
         self.results = None # This will hold everything you could possibly want
-
-        self.emline_model = None # The compound model to use in fitting
-                                 # emission lines
 
     def deredden(self):
         """
@@ -1084,12 +1079,12 @@ class IFUCube(object):
         print("worst continuum fitted bins: {}".format(worst_sl_bins))
         worst_el_bins = sorted(d.iterkeys(), 
                                key=(lambda key:
-                                    d[key]["emline_model"].chi2dof))[-N:]
+                                    d[key]["emline_res"]["chi2dof"]))[-N:]
         print("worst emission line fitted bins: {}".format(worst_el_bins))
         worst_bins = set(worst_sl_bins + worst_el_bins)
         for wb in worst_bins:
             self.plot_continuum(wb)
-            self.plot_emission_lines(wb)
+            self.plot_emission(wb)
 
 
     def plot_yio(self, age1=5e8, age2=5e9):
@@ -1282,20 +1277,13 @@ class IFUCube(object):
         p.join()
         print()
         print("emission line fitting complete")
-        for bn, emline_model in emline_results:
-            # if we have no param uncertainties then the fit is at the bounds
-            # of our limits and the fit is probably bad
-            bad = 0
-            if np.all(np.isnan(emline_model.param_uncerts)):
-                bad = 1
-            self.emline_output[int(bn)] = [emline_model, emline_model.chi2dof,
-                                           bad]
-            self.results["bin"][bn]["emline_model"] = emline_model
+        for bn, emline_res in emline_results:
+            self.results["bin"][bn]["emline_res"] = emline_res
 
 
-    def get_emission_line_fluxes(self, bin_num=None):
+    def parse_emission(self, bin_num=None):
         """
-        Calculate the equivalent widths of the emission lines.
+        Calculate useful quantities from the fitted emission line model.
 
         The values are calculated for each bin in ``bin_num`` and are based
         on the emission line models produced by run_emission_line(). Follows
@@ -1315,177 +1303,145 @@ class IFUCube(object):
             raise ValueError(">=1 bin numbers given do not exist")
 
         n_bins = len(bin_num)
-        #FIXME current link between submodel designation and the value
-        # in param_uncerts - not general!!!!
-        desname = {"_0":0,"_1":3,"_2":4,"_3":5,"_4":8,"_5":9,"_6":10,"_7":11}
         for i,bn in enumerate(bin_num,1):
-            print("getting emission line fluxes {:>5}/{:5}".format(i, n_bins),
+            print("parsing emission model {:>5}/{:5}".format(i, n_bins),
                   end="\r")
-            ew = []
-            ew_uncert = []
-            fluxes = []
-            fluxes_uncert = []
             bin_res = self.results["bin"][bn]
-            emline_model = bin_res["emline_model"]
-            for submodel_name  in emline_model.submodel_names:
-                #FIXME #FIXME This is implemented awfully!!!
-                #FIXME these should be attributes of the model directly
-                if submodel_name[-2:] in ["_0", "_1"]:
-                    # i.e. Balmer
-                    mean_uncert = emline_model.param_uncerts[1]
-                    stddev_uncert = emline_model.param_uncerts[2]
-                else:
-                    # i.e. Forbidden
-                    mean_uncert = emline_model.param_uncerts[6]
-                    stddev_uncert = emline_model.param_uncerts[7]
-                # FIXME use submodel name to determine which model uncert param
-                # we need for the amplitude...
-                amp_uncert = emline_model.\
-                             param_uncerts[desname[submodel_name[-2:]]]
-                #FIXME needs generalising!!!
-                submodel = emline_model[submodel_name]
-                # Get line flux. Uncertainty formula from LG IDL
-                flux = ((2*math.pi)**0.5 * submodel.stddev * submodel.amplitude
-                        * bin_res["fobs_norm"])
-                flux_uncert = ((2*math.pi)**0.5
-                               * ((stddev_uncert * submodel.amplitude)**2
-                                  + (submodel.stddev * amp_uncert)**2)**0.5
-                               * bin_res["fobs_norm"])
+            try:
+                emlines = bin_res["emline_res"]["lines"]
+            except KeyError:
+                print("skipping bin {}, no emission line results found"
+                      .format(bn))
+                continue
+            # Determine fluxes, EW and FWHM for each line
+            for line, fit  in emlines.items():
+                amp, mean, stddev = fit["fit_params"]
+                amp_sig, mean_sig, stddev_sig = fit["fit_uncerts"]
+
+                flux = (2*math.pi)**0.5 * stddev * amp
+                flux_uncert = ((2*math.pi)**0.5 * ((stddev_sig * amp)**2
+                                                   + (stddev * amp_sig)**2)**0.5)
+
                 # Find the lambda index of our line's mean and get the
-                # value of the continuum there
-                lamb_idx = np.abs(self.lamb - submodel.mean).argmin()
+                # value of the continuum there for EW calculation
+                lamb_idx = np.abs(self.lamb - mean).argmin()
                 cont = bin_res["sl_spec"][lamb_idx, 2] * bin_res["fobs_norm"]
+                # TODO turn these into quantities based on prim_head
+                # (i.e. in Ang, km/s etc).
+                emlines[line]["flux"] = flux
+                emlines[line]["flux_uncert"] = flux_uncert
+                emlines[line]["snr"] = flux/flux_uncert
+                emlines[line]["ew"] = flux/cont
+                emlines[line]["ew_uncert"] = flux_uncert/cont
+                to_fwhm = lambda x: x * 2 * (2*math.log(2))**0.5
+                emlines[line]["fwhm"] = to_fwhm(stddev)
+                emlines[line]["fwhm_uncert"] = to_fwhm(stddev_sig)
+                emlines[line]["offset"] = mean - emlines[line]["rest_lambda"]
 
-                fluxes.append(flux)
-                fluxes_uncert.append(flux_uncert)
-                ew.append(flux/cont)
-                ew_uncert.append(flux_uncert/cont)
-            bin_res["emline_ew"] = np.array(ew)
-            bin_res["emline_ew_uncert"] = np.array(ew_uncert)
-            bin_res["emline_fluxes"] = np.array(fluxes)
-            bin_res["emline_fluxes_uncert"] = np.array(fluxes_uncert)
-
-    def get_emission_line_metallicities(self, bin_num=None):
-        """
-        Calculates several metallicity values based on popular indicators.
-
-        Uses emission line fluxes from ``get_el_fluxes()`` and calculates PP04,
-        Marino+13, Dopita+16 ... values for metallicity of each bin. These are
-        saved under a new dictionary key 'metallicity' within the bins' results
-        dict. All resultsare given as :math:`12+\log(O/H)`
-
-        Parameters
-        ----------
-        bin_num : (None, int or array_like), optional
-            The bin numbers to calculate metallicities for (defaults to None, 
-            this will fit all bins)
-        """
-        if bin_num is None:
-            bin_num = self._get_bin_nums()
-        elif isinstance(bin_num, (int,float)):
-            bin_num = [bin_num]
-        if not np.all(np.in1d(bin_num, self._get_bin_nums())):
-            raise ValueError(">=1 bin numbers given do not exist")
-
-        #FIXME generalise! currently line fluxes are in order of:
-        # Ha, Hb, [NII]6548, [NII]6583, [SII]6716, [SII]6731, 
-        # [OIII]4959, [OIII]5007
-        n_bins = len(bin_num)
-        for i,bn in enumerate(bin_num,1):
-            print("getting emission line metallicities {:>5}/{:5}"
-                  .format(i,n_bins), end="\r")
-            bin_res = self.results["bin"][bn]
-            f = bin_res["emline_fluxes"]
-            f_uncert = bin_res["emline_fluxes_uncert"]
-            # We only consider fluxes with S/N > 3
-            f_snr = f/f_uncert
-            f[f_snr < 3] = np.nan
-            # And any zero fluxes are ignored
-            f[f == 0] = np.nan
-            fd = {"Halpha":f[0], "Hbeta":f[1], "[NII]6548":f[2],
-                         "[NII]6583":f[3], "[SII]6716":f[4], "[SII]6731":f[5], 
-                         "[OIII]4959":f[6], "[OIII]5007":f[7]}
+            # Determine metallcities where possible using SNR>3 lines only
+            if (emlines["Halpha_6563"]["snr"] > 3 and
+                emlines["[NII]_6583"]["snr"] > 3):
+                N2 = (np.log10(emlines["[NII]_6583"]["flux"]
+                               / emlines["Halpha_6563"]["flux"]))
+            else:
+                N2 = np.nan
+            if (emlines["[OIII]_5007"]["snr"] > 3 and
+                emlines["Hbeta_4861"]["snr"] > 3):
+                O3N2 = np.log10((emlines["[OIII]_5007"]["flux"]
+                                 / emlines["Hbeta_4861"]["flux"])
+                                / (10**N2))
+            else:
+                O3N2 = np.nan
+            if (emlines["[SII]_6716"]["snr"] > 3 and
+                emlines["[SII]_6731"]["snr"] > 3 and
+                emlines["[NII]_6583"]["snr"] > 3):
+                N2S2 = np.log10(emlines["[NII]_6583"]["flux"]
+                                / (emlines["[SII]_6716"]["flux"]
+                                   + emlines["[SII]_6731"]["flux"]))
+            else:
+                N2S2 = np.nan
             bin_res["metallicity"] = {}
-
-            #TODO allow custom indicators to be passed, or add
-            # data/metallicity_indicators.json
-            N2 = np.log10(fd["[NII]6583"]/fd["Halpha"])
-            O3N2 = np.log10((fd["[OIII]5007"]/fd["Hbeta"])
-                            / (fd["[NII]6583"]/fd["Halpha"]))
-            N2S2 = np.log10(fd["[NII]6583"]/(fd["[SII]6716"] + fd["[SII]6731"]))
-            y = N2S2 + 0.264 * N2 # Dopita+16
-
             bin_res["metallicity"]["PP04_N2"] = 8.90 + 0.57 * N2
             bin_res["metallicity"]["PP04_O3N2"] = 8.73 - 0.32 * O3N2
             bin_res["metallicity"]["M13"] = 8.533 - 0.214 * O3N2
-            bin_res["metallicity"]["D16"] = 8.77 + y
+            bin_res["metallicity"]["D16"] = 8.77 + N2S2 + 0.264 * N2
 
-    def plot_emission_lines(self, bin_num):
+
+    def plot_emission(self, bin_num):
         """
         Plot the residual emission line spectrum and results of emission
         line fitting for ``bin_num``
 
         """
-        res = self.results["bin"][bin_num]
+        bin_res = self.results["bin"][bin_num]
 
-        lamb = res["sl_spec"][:,0]
-        mask = res["spec"][:,3] == 2
+        lamb = bin_res["sl_spec"][:,0]
+        mask = bin_res["spec"][:,3] == 2
 
-        emline_obs = np.ma.masked_array((res["sl_spec"][:,1] -
-                                         res["sl_spec"][:,2]) *
-                                        res["fobs_norm"], mask=mask)
-        emline_uncert = np.ma.masked_array(res["spec"][:,2], mask=mask)
-        x = np.arange(lamb[0], lamb[-1], 0.25)
-        emline_model = res["emline_model"](x) * res["fobs_norm"]
+        emline_obs = np.ma.masked_array((bin_res["sl_spec"][:,1] -
+                                         bin_res["sl_spec"][:,2]) *
+                                        bin_res["fobs_norm"], mask=mask)
+        emline_uncert = np.ma.masked_array(bin_res["spec"][:,2], mask=mask)
+        emline_model = _get_emline_model(self.emission_lines,
+                                         bin_res["emline_res"])
 
         plt.close("all")
-        elfig,(ax1,ax2,ax3) = plt.subplots(1, 3, sharey=True,figsize=(10,5))
 
-        for ax in (ax1,ax2,ax3):
-            ax.plot(lamb, emline_obs, c=OBSCOL,lw=1)
-            ax.fill_between(lamb, emline_obs-emline_uncert,
-                            emline_obs+emline_uncert, color=ERRCOL)
-            ax.plot(x, emline_model, c=MASKCOL,lw=1)
-            ax.axvline(res["emline_model"].mean_0, ls="--", c="grey", lw=0.5)
-            ax.axvline(res["emline_model"].mean_1, ls="--", c="grey", lw=0.5)
-            ax.axvline(res["emline_model"].mean_2, ls="--", c="grey", lw=0.5)
-            ax.axvline(res["emline_model"].mean_3, ls="--", c="grey", lw=0.5)
-            ax.axvline(res["emline_model"].mean_4, ls="--", c="grey", lw=0.5)
-            ax.axvline(res["emline_model"].mean_5, ls="--", c="grey", lw=0.5)
-            ax.axvline(res["emline_model"].mean_6, ls="--", c="grey", lw=0.5)
-            ax.axvline(res["emline_model"].mean_7, ls="--", c="grey", lw=0.5)
-        ax2.set_xlabel("Wavelength [{}]".format(self.lamb_units.to_string()))
-        ax1.set_ylabel("F$_\\lambda$")
-        ax1.set_xlim(4830,5020)
-        ax2.set_xlim(6510,6600)
-        ax3.set_xlim(6690,6750)
-        ax1.yaxis.tick_left()
-        ax2.yaxis.set_ticks_position('none')
-        ax3.yaxis.tick_right()
-        ax2.xaxis.set_major_locator(ticker.MultipleLocator(20))
-        ax3.xaxis.set_major_locator(ticker.MultipleLocator(20))
-        ax1.spines['right'].set_visible(False)
-        ax2.spines['left'].set_visible(False)
-        ax2.spines['right'].set_visible(False)
-        ax3.spines['left'].set_visible(False)
-    
-        # get visible limits of data and adjust y axis limits based on those
-        #FIXME relies on hardcoded emissionline limits - need to generalise
-        visible = ((lamb >= 4830) & (lamb <= 5020)) | \
-                  ((lamb >= 6510) & (lamb <= 6600)) | \
-                  ((lamb >= 6690) & (lamb <= 6750))
-        plt.ylim(np.min((emline_obs-emline_uncert)[visible]),
-                 np.max((emline_obs+emline_uncert)[visible]))
+        # Determine how many zoomed-in windows on the full wavelength
+        # range we need
+        lambm = np.ma.masked_array(lamb, mask = np.ones(len(lamb)))
+        for submodel in emline_model:
+            low_idx = np.abs(lamb - (submodel.mean-25)).argmin()
+            upp_idx = np.abs(lamb - (submodel.mean+25)).argmin()
+            lambm.mask[low_idx:upp_idx] = 0
+        slices = np.ma.clump_unmasked(lambm)
+        nax = len(slices)
+        elfig, axes = plt.subplots(1, nax, sharey=True,figsize=(13,5))
+
+        for slc, ax in zip(slices,axes):
+            ax.plot(lamb[slc], emline_obs[slc], c=OBSCOL,lw=2)
+            ax.fill_between(lamb[slc], emline_obs[slc]-emline_uncert[slc],
+                            emline_obs[slc]+emline_uncert[slc], color=ERRCOL)
+            x = np.arange(lamb[slc.start], lamb[slc.stop], 0.25)
+            ax.plot(x, emline_model(x), c=MASKCOL,lw=2, ls="--")
+            for submodel in emline_model:
+                if not (lamb[slc.start] < submodel.mean < lamb[slc.stop]):
+                    continue
+                ax.axvline(submodel.mean.value, ls="--", c="grey", lw=0.5)
+                label = " ".join(submodel.name.split("_")[:2])
+                ax.text(submodel.mean.value-2, submodel.amplitude.value*0.7,
+                        label, rotation=90, ha="right", va="bottom")
+            ax.set_xlim(lamb[slc.start], lamb[slc.stop])
+            ax.xaxis.set_major_locator(ticker.MultipleLocator(20))
+            ax.tick_params(axis="x", labelsize=10)
+        axes[0].set_ylim(ymin=np.min(emline_obs[slc]-emline_uncert[slc]))
+
+        axes[0].spines["right"].set_visible(False)
+        axes[-1].spines["left"].set_visible(False)
+        axes[0].yaxis.tick_left()
+        axes[-1].yaxis.tick_right()
+        for ax in axes[1:-1]:
+            ax.yaxis.set_ticks_position("none")
+            ax.spines["right"].set_visible(False)
+            ax.spines["left"].set_visible(False)
+
+        # Add common x and y labels
+        bigax = elfig.add_subplot(111, frameon=False)
+        bigax.set_axis_bgcolor("none")
+        bigax.tick_params(labelcolor="none", top="off", bottom="off",
+                          left="off", right="off")
+        bigax.set_ylabel("F$_\\lambda$")
+        bigax.set_xlabel("Wavelength [{}]".format(self.lamb_units.to_string()))
 
         elfig.suptitle("$\\chi^2/\\textrm{{dof}} = {:.3f}$, " "$\\bar{{x}} = "
                        "{:.2f}$, $\\bar{{y}} = {:.2f}$"
-                       .format(res["emline_model"].chi2dof, res["x_bar"],
-                               res["y_bar"], ),color="k", size=12)
+                       .format(bin_res["emline_res"]["chi2dof"],
+                               bin_res["x_bar"], bin_res["y_bar"])
+                       , color="k", size=12)
         elfig.subplots_adjust(wspace=0.1)
         elfig.savefig(self.base_name+"_el_fit_{}.png".format(bin_num),
-                      bbox_inches="tight",dpi=300)
+                      bbox_inches="tight", dpi=300)
         print("plot saved to {}_el_fit_{}.png".format(self.base_name, bin_num))
-
 
     def plot_metallicity(self, indicator="D16"):
         """
@@ -1684,14 +1640,6 @@ class IFUCube(object):
             pickle.dump(pkl_dict, output)
         print("moving to {}".format(pkl_file))
         shutil.move(temp, pkl_file)
-        
-class EmissionLineModel(models.Gaussian1D + models.Gaussian1D +
-                        models.Gaussian1D + models.Gaussian1D +
-                        models.Gaussian1D + models.Gaussian1D +
-                        models.Gaussian1D + models.Gaussian1D):
-    # Used to explicitly define the emission line compond model in the module,
-    # otherwise dill/pickle face difficulties relating to namespace issues
-    pass
 
                 
 class MUSECube(IFUCube):
@@ -1746,6 +1694,33 @@ class MUSECube(IFUCube):
         cube_hdu[0].header["IFU_Z"] = float(redshift)
 
         super(MUSECube, self).__init__(cube_hdu, base_name, RV, sl_dir)
+
+def _get_emline_model(emlines, res=None):
+    """
+    Dynamically create the model to describe the emission lines.
+
+    If res is given, the parameters of the model are filled from
+    that dict.
+    """
+    model = None
+    for elem, wl in emlines.items():
+        if elem[0]+elem[-1] == "[]":
+            t = "F"
+        else:
+            t = "B"
+        for n, _wl in enumerate(map(float, wl)):
+            submodel_name = "{}_{:.0f}_{}_{}".format(elem, _wl, n, t)
+            if res is not None:
+                line = "{}_{:.0f}".format(elem, _wl)
+                params = res["lines"][line]["fit_params"]
+            else:
+                params = (1., 0., 1.)
+            if model is None:
+                model = models.Gaussian1D(*params).rename(submodel_name)
+            else:
+                model += models.Gaussian1D(*params).rename(submodel_name)
+
+    return model
 
 
 def get_IRSA_ebv(header):
@@ -1891,7 +1866,6 @@ def get_line_map(data_cube, lamb, line_lamb, filter_width=60, cont_width=60,
     return [filter_map, cont_map, line_map]
 
 
-
 def resample_base(basefile, obs_lamb, delta_lamb, buffer_lamb=500):
     """
     Resample starlight base files to match ``delta_lamb`` and restrict coverage
@@ -1909,6 +1883,7 @@ def resample_base(basefile, obs_lamb, delta_lamb, buffer_lamb=500):
     b_new = np.vstack((interp_lamb, interp_flux)).T
     np.savetxt(basefile, b_new)
 
+
 def fit_starlight(fargs):
     """
     Perform the fitting of a spectrum with starlight and return the bin number
@@ -1917,7 +1892,7 @@ def fit_starlight(fargs):
     bin_num, spec_file, lamb, delta_lamb, tmp_dir, bases, low_sn, upp_sn = fargs
 
     print("fitting bin number {:>5}".format(bin_num), end="\r")
-
+    sys.stdout.flush()
     out_file = os.path.basename(spec_file)+"_out"
     # Write a grid file for starlight (see manual)
     with tempfile.NamedTemporaryFile(prefix="grid_", dir=tmp_dir, 
@@ -1959,7 +1934,7 @@ def fit_starlight(fargs):
 def fit_emission_lines(fargs):
     bin_num, bin_res, el, vd_init, v0_init, amp_init, stddev_b, off_b, w = fargs
     print("fitting bin number {:>5}".format(bin_num), end="\r")
-
+    sys.stdout.flush()
     spec = bin_res["sl_spec"]
 
     if w:
@@ -1972,43 +1947,39 @@ def fit_emission_lines(fargs):
     else:
         spec[:,3] = np.ones(len(spec[:,0]))
 
-    # FIXME needs generalising
-    el_init = EmissionLineModel().rename("el_init_{}".format(bin_num))
+    # Contruct a model based on our emission lines
+    el_init = _get_emline_model(el).rename(bin_num)
+    # Add bounds and ties to the parameters prior to fitting
+    for sm in el_init.submodel_names:
+        e, wl, n, t = sm.split("_")
+        n = int(n)
+        if sm in ("Halpha_6563_0_B", "[NII]_6583_1_F"):
+            el_init[sm].mean.bound = [el[e][n] * (1+off_b[0]/ckms),
+                                      el[e][n] * (1+off_b[1]/ckms)]
+            el_init[sm].stddev.bounds =  [el[e][n] * stddev_b[0]/ckms,
+                                          el[e][n] * stddev_b[1]/ckms]
+            continue
+        if sm[-1] == "B":
+            # Tie to Halpha 6563
+            s = ("Halpha_6563_0_B", "Halpha", 0)
+        if sm[-1] == "F":
+            # Tie to [NII] 6583
+            s = ("[NII]_6583_1_F", "[NII]", 1)
+        el_init[sm].mean.tied = lambda x, e=e,n=n,s=s: (el[e][n]
+                                                * x[s[0]].mean/el[s[1]][s[2]])
+        el_init[sm].stddev.tied = lambda x, s=s, sm=sm: ((x[s[0]].stddev
+                                                          / x[s[0]].mean)
+                                                         * x[sm].mean)
 
-    # Fix the peaks of the other gaussians relative to Halpha and [NII]
-    el_init.mean_1.tied = lambda x: el["Hbeta"][0] * x.mean_0/el["Halpha"][0]
-    el_init.mean_2.tied = lambda x: el["[NII]"][0] * x.mean_3/el["[NII]"][1]
-    el_init.mean_4.tied = lambda x: el["[SII]"][0] * x.mean_3/el["[NII]"][1]
-    el_init.mean_5.tied = lambda x: el["[SII]"][1] * x.mean_3/el["[NII]"][1]
-    el_init.mean_6.tied = lambda x: el["[OIII]"][0] * x.mean_3/el["[NII]"][1]
-    el_init.mean_7.tied = lambda x: el["[OIII]"][1] * x.mean_3/el["[NII]"][1]
-    # Tie widths of balmer/forbidden lines separately
-    el_init.stddev_1.tied  = lambda x: (x.stddev_0/x.mean_0) * x.mean_1 
-    el_init.stddev_2.tied  = lambda x: (x.stddev_3/x.mean_3) * x.mean_2 
-    el_init.stddev_4.tied  = lambda x: (x.stddev_3/x.mean_3) * x.mean_4 
-    el_init.stddev_5.tied  = lambda x: (x.stddev_3/x.mean_3) * x.mean_5 
-    el_init.stddev_6.tied  = lambda x: (x.stddev_3/x.mean_3) * x.mean_6 
-    el_init.stddev_7.tied  = lambda x: (x.stddev_3/x.mean_3) * x.mean_7
-
-    # Add some bounds that are quite generous. If the best fit is at one of
-    # these limits we won't get the covariance matrix and cannot estimate
-    # uncertainties. However, in this case the fit is likely to be suspect.
-    el_init.mean_0.bounds = [el["Halpha"][0] * (1+off_b[0]/ckms), 
-                             el["Halpha"][0] * (1+off_b[1]/ckms)]
-    el_init.stddev_0.bounds =  [el["Halpha"][0] * stddev_b[0]/ckms, 
-                                el["Halpha"][0] * stddev_b[1]/ckms]
-    el_init.mean_3.bounds = [el["[NII]"][1] * (1+off_b[0]/ckms), 
-                             el["[NII]"][1] * (1+off_b[1]/ckms)]
-    el_init.stddev_3.bounds =  [el["[NII]"][1] * stddev_b[0]/ckms, 
-                                el["[NII]"][1] * stddev_b[1]/ckms]
-
-    # Mask regions away from emission lines
-    lamb_mask_rows = (spec[:,0] < 4840) | \
-                     ((4880 < spec[:,0]) & (spec[:,0] < 4940)) | \
-                     ((5025 < spec[:,0]) & (spec[:,0] < 6530)) | \
-                     ((6600 < spec[:,0]) & (spec[:,0] < 6695)) | \
-                     (spec[:,0] > 6750)
-    el_spec = spec[~lamb_mask_rows]
+    # Mask regions away from emission lines outside windows of
+    # offset_limit + 3*stddev_limit around line rest wavelengths
+    rest_lambdas = np.array([wl for wls in el.values() for wl in wls])
+    lims = 1 + (np.array(off_b) + 3*np.array((-stddev_b[1], stddev_b[1])))/ckms
+    fit_limits = rest_lambdas[:,None] * lims
+    to_fit = np.zeros(len(spec[:,0]), bool)
+    for lim in fit_limits:
+        to_fit[(lim[0] <= spec[:,0]) & (spec[:,0] <= lim[1])] = True
+    el_spec = spec[to_fit]
 
     # Use the initial guesses for param combinations later
     if v0_init == "vstar":
@@ -2022,8 +1993,6 @@ def fit_emission_lines(fargs):
     # Make combinations of all parameter initial guesses.
     param_comb = list(product(amp_init, offset_init, stddev_init)) 
     Ncomb = len(param_comb)
-    #TODO this also returns the indices of the parameters in the initial list -
-    #can maybe use somehow for the fluxes/ew measurements?
     dof = len(fitting._model_to_fit_params(el_init)[0])
     chi2dof = 1e50
     best_fit = None
@@ -2032,14 +2001,10 @@ def fit_emission_lines(fargs):
     for i,comb in enumerate(param_comb, 1):
         # Make an initialisation of the model using this combo
         amp, off, sd = comb
-        el_init.parameters = [amp, el["Halpha"][0] * off, el["Halpha"][0] * sd,
-                              amp, el["Hbeta"][0] * off, el["Hbeta"][0] * sd,
-                              amp, el["[NII]"][0] * off, el["[NII]"][0] * sd,
-                              amp, el["[NII]"][1] * off, el["[NII]"][1] * sd,
-                              amp, el["[SII]"][0] * off, el["[SII]"][0] * sd,
-                              amp, el["[SII]"][1] * off, el["[SII]"][1] * sd,
-                              amp, el["[OIII]"][0] * off, el["[OIII]"][0] * sd,
-                              amp, el["[OIII]"][1] * off, el["[OIII]"][1] * sd]
+        for sm in el_init.submodel_names:
+            elem, wl, n, t = sm.split("_")
+            wavelengh = el[elem][int(n)]
+            el_init[sm].parameters = [amp, wavelengh*off, wavelengh*sd]
         # Create the fitter and perform the fit for this combination
         levmar_fitter = fitting.LevMarLSQFitter()
         with warnings.catch_warnings():
@@ -2051,32 +2016,27 @@ def fit_emission_lines(fargs):
         diff = (el_spec[:,1] - el_spec[:,2]) - el_fit(el_spec[:,0])
         _chi2 = np.nansum((diff * el_spec[:,3])**2)
         _chi2dof = _chi2/dof
-
         if _chi2dof < chi2dof:
             chi2dof = _chi2dof
             best_fit = el_fit
             # Here we explicitly pass the fit info dict to our fitted model
             best_fit.fit_info = levmar_fitter.fit_info
+            best_fit.chi2dof = chi2dof
 
     # We cannot put constraints on the parameters and still get a covariance
     # matrix, so here we correct any negative amplitudes since these are suppose
-    # to be emission features (#TODO generalise this and do the opposite for
-    # absorption features)
-    for submodel in best_fit.submodel_names:
+    # to be emission features
+    for sm in best_fit.submodel_names:
         # TODO add here if submodel has 'emission' in the name then min 0 (and
-        # vice verse) need to name the submodels in the EmissionLineModel class
-        if best_fit[submodel].amplitude.value < 0:
-            best_fit[submodel].amplitude.value = 0
+        # vice versa)
+        if best_fit[sm].amplitude.value < 0:
+            best_fit[sm].amplitude.value = 0
 
-    best_fit.chi2dof = chi2dof
-    if best_fit.fit_info["param_cov"] is None:
-        print("no covariance matrix computed for bin {}, cannot"
-              " compute fit uncertainties".format(bin_num))
-        best_fit.param_uncerts = np.empty(dof) * np.nan
-    else:
-        best_fit.param_uncerts = np.diag(best_fit.fit_info["param_cov"])**0.5
+    # Save all parameters for the model and uncertainties.
+    res = _model_to_res_dict(best_fit, el, bin_res["fobs_norm"])
 
-    return bin_num, best_fit
+    return bin_num, res
+
 
 def parse_starlight(sl_output):
     """
@@ -2114,8 +2074,68 @@ def parse_starlight(sl_output):
                                           usecols=(0,1,2,3,4,5,6,8))
     return results_dict
          
+
+def _model_to_res_dict(model, el, fobs_norm=1):
+    """
+    Given an emission line fitted model, return a dictionary of fitted
+    parameters and uncertainties.
+    """
+    res = {}
+
+    res["chi2dof"] = model.chi2dof
+
+    j = 0
+    try:
+        fitted_uncerts = np.diag(model.fit_info["param_cov"])**0.5
+    except ValueError:
+        print("no covariance matrix computed for bin {}, cannot"
+              " compute fit uncertainties".format(model.name))
+        dof = len(fitting._model_to_fit_params(model)[0])
+        fitted_uncerts = np.empty(dof) * np.nan
+        res["bad"] = 1
+    else:
+        res["bad"] = 0
+
+    b_idx = model.submodel_names.index("Halpha_6563_0_B")
+    f_idx = model.submodel_names.index("[NII]_6583_1_F")
+    if b_idx < f_idx:
+        f_idx += 2
+    elif f_idx < b_idx:
+        b_idx += 2
+
+    res["lines"] = {}
+    for i,sm in enumerate(model.submodel_names):
+        e, wl, n, t = sm.split("_")
+        n = int(n)
+        name = "{}_{}".format(e, wl) # `elem_wl`
+        res["lines"][name] = {}
+        sm_res = res["lines"][name]
+        # Store the amplitude, mean and stddev of the gaussians
+        sm_res["fit_params"] = model.parameters[i*3:i*3+3]
+        sm_res["fit_params"][0] *= fobs_norm # remove amp normalisation
+        # Retrieve uncertainties using indexes of our
+        # primary balmer/forbidden lines since the fitting
+        # does not return uncertainties for tied parameters
+        sm_uncerts = np.empty(3)
+        sm_uncerts[0] = fitted_uncerts[j] * fobs_norm # " amp "
+        if sm.endswith("B"):
+            idx = b_idx
+        elif sm.endswith("F"):
+            idx = f_idx
+        sm_uncerts[1] = fitted_uncerts[idx+1] # mean
+        sm_uncerts[2] = fitted_uncerts[idx+2] # stddev
+        if name in ("Halpha_6563_0_B", "[NII]_6583_1_F"):
+            j += 3
+        else:
+            j += 1
+        sm_res["fit_uncerts"] = sm_uncerts
+        # Store the rest wavelength to calculate offsets later
+        sm_res["rest_lambda"] = el[e][n]
+
+    return res
   
-def shiftedColorMap(cmap, start=0, midpoint=0.5, stop=1.0, name='shiftedcmap'):
+
+def shiftedColorMap(cmap, start=0, midpoint=0.5, stop=1.0, name="shiftedcmap"):
     """
     Function to offset the "center" of a colormap. Useful for data
     with a negative min and positive max and you want the middle of
@@ -2139,10 +2159,10 @@ def shiftedColorMap(cmap, start=0, midpoint=0.5, stop=1.0, name='shiftedcmap'):
 
     """
     cdict = {
-        'red': [],
-        'green': [],
-        'blue': [],
-        'alpha': []
+        "red": [],
+        "green": [],
+        "blue": [],
+        "alpha": []
     }
 
     # regular index to compute the colors
@@ -2157,10 +2177,10 @@ def shiftedColorMap(cmap, start=0, midpoint=0.5, stop=1.0, name='shiftedcmap'):
     for ri, si in zip(reg_index, shift_index):
         r, g, b, a = cmap(ri)
 
-        cdict['red'].append((si, r, r))
-        cdict['green'].append((si, g, g))
-        cdict['blue'].append((si, b, b))
-        cdict['alpha'].append((si, a, a))
+        cdict["red"].append((si, r, r))
+        cdict["green"].append((si, g, g))
+        cdict["blue"].append((si, b, b))
+        cdict["alpha"].append((si, a, a))
 
     newcmap = colors.LinearSegmentedColormap(name, cdict)
     plt.register_cmap(cmap=newcmap)
@@ -2168,5 +2188,4 @@ def shiftedColorMap(cmap, start=0, midpoint=0.5, stop=1.0, name='shiftedcmap'):
     return newcmap     
 
 if __name__ == "__main__":
-    #TODO argparse for cli?
     pass
