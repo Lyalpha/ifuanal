@@ -171,31 +171,81 @@ not want to perform fitting to low signal-to-noise ratio (SNR) spaxels. To
 circumvent this we employ spaxel binning.
 
 The spaxels are to be binned into distinct regions in order to increase the S/N
-of the composite region spectra for fitting. :ref:`vor-binning` and
-:ref:`hii-binning` are the two currently implemented methods, with the ability
+of the composite region spectra for fitting. :ref:`hii-binning` and
+:ref:`vor-binning` are the two currently implemented methods, with the ability
 to also :ref:`add custom bins <custom-bins>`.
 
-These binning routines will populate an attribute of :class:`~ifuanal.IFUCube`
-named :attr:`bin_nums`. Once a binning routine has been performed, this will
-appear as a ``dict`` of the form: ::
+These binning routines will populate :ref:`results-dict` with each bin. The
+information is stored as follows for bin number ``bn``: ::
 
-  >>> cube.bin_nums
-  {0: {'mean': (x_mean, y_mean),
-       'spax': (x_spax, y_spax)},
-   1: { ... }
-   ...
+  >>> cube.results["bin"][bn]
+  {'mean': (x_mean, y_mean),  # the pixel coordinates of the centre of the bin
+   'spax': (x_spax, y_spax)}, # the pixel coordinates of the spaxels in the bin
+   'spec': 4xN array,         # cols: lambda, flux(lambda), sigma(lambda), flag
+   'dist_min': float,         # minimum distance to nucleus
+   'dist_max': float,         # maximum distance to nucleus
+   'dist_mean': float,        # distance of 'mean' to nucleus
+   'continuum': {},           # dict populated once continuum fitting is done
+   'emission': {},            # dict populated once emission fitting is done
   }
 
-The entry ``mean`` gives the centre of the bin (for Vornoi binning this is the
-centre of mass, for the HII region binning, this is the peak). ``spax`` gives
-the spatial indices of the datacube belonging to that bin. e.g. ::
+For Vornoi binning, ``mean`` is the centre of mass, whereas for the HII region
+binning, this is the seed peak.
 
-  >>> cube.bin_nums[100]["spax"] # get the x and y coordinates of bin 100
+In the case of a single spaxel bin, ``spec`` is just copied from the input data
+and stddev cube. For a multi-spaxel bin, the weighted mean of the data and
+uncertainties of all individual spaxels in the bin are used.
+
+See :ref:`results-dict` for information on accessing and using this information.
 
 .. Note::
 
-   To repeat or redo binning once :attr:`bin_nums` is populated, pass the
-   argument ``clobber= True`` in the binning method's call.
+   To repeat or redo binning, pass the argument ``clobber= True`` in the
+   binning method's call. **This will also remove existing bin results
+   including continuum and emission fitting.**
+
+.. _hii-binning:
+
+HII region binning
+^^^^^^^^^^^^^^^^^^
+
+This binning algorithm uses the method of `HII explorer
+<http://www.caha.es/sanchez/HII_explorer/>`_, with a python
+implementation, to grow bins around peaks in the emission line flux. ::
+
+  >>> cube.emission_line_bin(min_peak_flux=1100, min_frac_flux=0.1,
+  ... max_radius=5, min_flux=600)
+  binning spaxels using HII explorer algorithm around emission line 6562.8
+  processing bin seed [i]/[m]
+  found [n] bins
+
+A description of these required arguments is available in the documentation for
+:meth:`~ifuanal.IFUCube.emission_line_bin`. These will have to be tailored to
+each data cube. Although usually (and by default) the binning will be done for
+the H\ :math:`\alpha` line, any line or wavelength can be chosen via the
+``line_lamb`` argument.
+
+Briefly, the method is:
+
+1. :func:`~ifuanal.get_line_map` is called. This returns an emission line map
+by simulating a narrowband filter observation of the datacube and subtracting a
+continuum determined by two neighbouring filters.
+
+2. All peaks equal to or above ``min_peak_flux`` in this map are found via
+:func:`scipy.ndimage.maximum_filter`. These peaks are allowed to be close since
+the subsequent growth of the bins will merge nearby peaks.
+
+3. Starting with the brightest, these peaks are the seeds for new bins. All
+   nearby pixels that satisfying the following are included in the bin:
+
+   * within ``max_radius`` of peak.
+   * flux is above ``min_flux`` and ``min_frac_flux`` :math:`\times` peak
+     flux.
+   * is not already been allocated a bin.
+
+The resulting bins are then saved in :attr:``results["bin"]``. By default a
+plot of the emission line map creation and the bins will be produced and saved
+as `_bins_el.pdf`.
 
 .. _vor-binning:
 
@@ -213,53 +263,15 @@ is 5590 to 5680) and emission line signal-to-noise ratios can be estimated by
 subtracting off a continuum SNR (see docs for
 :meth:`~ifuanal.IFUCube.voronoi_bin`) ::
 
-  >>> cube.voronoi_bin()
-  voronoi_binning with S/N target of 20
-  ... [voronoi output] ...
+  >>> cube.voronoi_bin(target_sn=20)
+  binning spaxels with Voronoi algorithm with S/N target of 20
+  [voronoi output]
+  processing bin [i]/[n]
+  found [n] bins
 
 
-By default a plot of the bins and their S/N will be produced and saved as
-`_bins_vor.pdf`.
-
-.. _hii-binning:
-
-HII region binning
-^^^^^^^^^^^^^^^^^^
-
-This binning algorithm uses the method of `HII explorer
-<http://www.caha.es/sanchez/HII_explorer/>`_, with a python
-implementation, to grow bins around peaks in the emission line flux. ::
-
-  >>> cube.emission_line_bin(min_peak_flux=1100, min_frac_flux=0.1,
-  ... max_radius=5, min_flux=600)
-
-A description of these required arguments is available in the documentation for
-:meth:`~ifuanal.IFUCube.emission_line_bin`. These will have to be tailored to
-each data cube. Although usually the binning will be done for the
-H\ :math:`\alpha` line, any line or wavelength can be chosen via the
-``line_lamb`` argument.
-
-Briefly, the method is:
-
-1. :func:`~ifuanal.get_line_map` is called. This returns an emission line map
-by simulating a narrowband filter observation of the datacube and subtracting a
-continuum determined by two neighbouring filters.
-
-2. All peaks equal to or above ``min_peak_flux`` in this map are found via
-:func:`scipy.ndimage.maximum_filter`. These peaks are allowed to be close as
-the subsequent growth of the bins will merge nearby peaks.
-
-3. Starting with the brightest, these peaks are the seeds for new bins. All
-   nearby pixels that satisfying the following are included in the bin:
-
-   * within ``max_radius`` of peak.
-   * flux is above ``min_flux`` and ``min_frac_flux`` :math:`\times` peak
-     flux.
-   * fas not already been allocated a bin.
-
-The resulting bins are then saved in :attr:``bin_nums``. By default a plot of
-the emission line map creation and the bins will be produced and saved as
-`_bins_el.pdf`.
+The resulting bins are then saved in :attr:``results["bin"]``. By default a
+plot of the bins and their S/N will be produced and saved as `_bins_vor.pdf`.
 
 .. _custom-bins:
 
@@ -271,10 +283,12 @@ negative bin numbers beginning at ``-1`` in results.
 
 As an example we make an SDSS-like 3 arcsec fibre on the galaxy nucleus: ::
 
-  >>> cube.add_custom_bin([160.592, 166.442], 3/0.2)
+  >>> cube.add_custom_bin([160.592, 166.442], 2/0.2)
   "added custom bin -1 to the list"
 
-where 0.2 is the pixel scale of MUSE in arcsecs. Once all fitting has been performed, the results for this bin (assuming it was the first or only custom bin to be added) can be accessed via the bin number -1 in the :ref:`results-dict`
+where 0.2 is the pixel scale of MUSE in arcsecs. Once all fitting has been
+performed, the results for this bin (assuming it was the first custom bin to be
+added) can be accessed via the bin number -1 in the :ref:`results-dict`
 
 .. TODO::
 
@@ -298,15 +312,19 @@ Stellar continuum fitting is performed via `STARLIGHT
 
   >>> cube.run_starlight()
   running starlight fitting
-  ... [starlight fitting output] ...
-  >>> cube.parse_results()
-  ... [parsing output] ...
+  fitting [n] bins...
+  STARLIGHT tmp directory for this run is /tmp/starlight_[random]/
+  resampling base files [i]/[m]
+  fitting bin number [i]
+  parsing results
+  [failed to parse /tmp/starlight_[random]/spec_[random]_out for bin [j]]
+  parsing starlight output [i]/[n]
 
 **Extended version:**
 
 Recommended reading for more information on the setup of STARLIGHT and in
 particular the format of the config/mask/grid files is the extensive manual for
-version 4.
+version 4 `here <http://www.starlight.ufsc.br/papers/Manual_StCv04.pdf>`_.
 
 By default all bins will be fitted, or a list of bin numbers can be passed
 explicitly as the :attr:`bin_num` argument. The default set of bases are 45
@@ -332,26 +350,35 @@ Bruzual & Charlot (2003) models, this can be changed through the use of the
 
 The process for a single bin is as follows:
 
-1. Find all spaxels in the bin and
-   a. if we have 1 spaxel, return that spectrum from the data cube.
-   b. if we have >1 spaxels, return the weighted mean of these spectra from the
-   data cube.
-2. Write the spectrum to `/tmp/starlight_[random]/spec_[random]`.
+1. Access the spectrum of the bin via :ref:`results-dict`.
+2. Write this spectrum to `/tmp/starlight_[random]/spec_[random]`.
 3. Write a `grid` file used by STARLIGHT to
    `/tmp/starlight_[random]/grid_[random]`.
 4. Call the STARLIGHT executable for this bin and return the file name of the
-   output.
+   output (the spectrum file with a `_out` suffix).
 
-Once all bins are fit the file names of the results are mapped to the bin
-numbers in a text file `_sloutputs.txt` as well as in a dictionary,
-:attr:`sl_output`, in the class.
+Once all bins are fit, a call to :meth:`~ifuanal.IFUCube._parse_continuum` then
+reads these STARLIGHT output files and parses the information into the
+`"continuum"` entry in :attr:``results`` for each bin (see
+:ref:`results-dict`). The dictionary entry `"continuum"` is populated with the
+results of the STARLIGH fitting, please consulte the STARLIGHT documentation
+(section 6 of the version 4 manual) for more information on these. In
+particular, `"bases"` is the population mixture of the bases used to create the
+best fitting continuum and `"sl_spec"` is the synthetic spectrum.
 
-A call to :meth:`~ifuanal.IFUCube.parse_results` will then read these STARLIGHT output files
-and store the pertinant results into a large dictionary :attr:`results` (see
-:ref:`results-dict`). Any bins without output or where the output does not
-follow the standard STARLIGHT output style will not be saved and their values
-will also be removed from :attr:`bin_nums` (i.e. they are not considered in the
-emission line fitting).
+Any bins without output or where the output does not follow the standard
+STARLIGHT output style will be shown in the terminal (`failed to
+parse...`). This is usually due to normalisation errors in STARLIGHT where
+there is ~0 flux in the continuum - the file printed to the terminal can be
+inspected for further investigation. For a failed bin number of ``bn``, the
+follow flag is set: ::
+
+  >>> cube.results["bin"][bn]["continuum"]["bad"]
+  1
+
+This is ``0`` otherwise.
+
+
 
 .. _emission-fitting:
 
@@ -364,9 +391,11 @@ the lines given in `data/emission_lines.json`.
 **The tl;dr version:** ::
 
   >>> cube.run_emission_lines()
-  ... [emission lines output] ...
-  >>> cube.parse_emission()
-  ... [parsing output] ...
+  fitting emission lines to [n] bins...
+  fitting bin number [i]
+  [no covariance matrix computed for bin [j], cannot compute fit uncertainties]
+  emission line fitting complete
+  parsing emission model [i]/[n]
 
 **Extended version:**
 
@@ -423,7 +452,8 @@ results later or elsewhere via pickling (performed with `dill
 <`https://github.com/uqfoundation/dill>`_). ::
 
   >>> cube.save_pkl()
-  writing cube to NGC2906.pkl.fits
+  writing cube to temporary file /cwd/ifuanal_[random].pkl.fits
+  moving to NGC2906.pkl.fits
   writing to temporary pickle file /cwd/ifuanal_[random].pkl
   moving to NGC2906.pkl
 
@@ -435,7 +465,7 @@ FITS file we loaded. A FITS file with the specific name `[pkl_filename].fits`
 will be searched for when loading the instance and so a copy should be left
 alongside the pickle file.
 
-The instance can then be loaded later to return tothe same state, by
+The instance can then be loaded later to return to the same state, by
 specifiying the pickle file to load:::
 
   >>> cube2 = ifuanal.IFUCube.load_pkl("NGC2906.pkl")
@@ -467,9 +497,8 @@ As an example, to see the results for a bin of number
 ``bn``, type: ::
 
   >>> cube.results["bin"][bn]
-  ... [bin results output] ...
 
-The ``results`` dictionary contains
+The ``results`` dictionary contains...
 
 .. TODO::
    Write this section.
