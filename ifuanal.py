@@ -8,7 +8,6 @@ from __future__ import print_function
 __version__ = "0.3.0"
 __author__ = "J. Lyman"
 
-
 from itertools import repeat, cycle, product
 import json
 import math
@@ -126,7 +125,7 @@ class IFUCube(object):
 
         self.sl_output = {} # dictionary of {[bin number]: ["starlight
                             # outfile", "spec infile",}
-        self.results = None # This will hold everything you could possibly want
+        self.results = {} # This will hold everything you could possibly want
 
     def deredden(self):
         """
@@ -278,6 +277,8 @@ class IFUCube(object):
                         round(yc-box_size+g.y_mean,3))
         print("found nucleus as {}".format(self.nucleus))
 
+        self.results["nucleus"] = self.nucleus
+
         # Plot the data with the best-fit model
         if plot:
             plt.close("all")
@@ -297,7 +298,6 @@ class IFUCube(object):
             plt.gcf().text(0.5,0.05,"nucleus = "+str(self.nucleus),
                            ha="center", va="center")
             plt.savefig(self.base_name+"_nucleus.pdf", bbox_inches="tight")
-
 
     def voronoi_bin(self, target_sn, lamb_low=5590., lamb_upp=5680.,
                     cont_lamb_low=None, cont_lamb_upp=None, clobber=False,
@@ -340,7 +340,6 @@ class IFUCube(object):
         ``>>> IFUCube.voronoi_bin(lamb_low=6540., lamb_upp=6580.,``\
         ``cont_lamb_low=6600, cont_lamb_upp=6640)``
 
-
         References
         ----------
         Uses the algorithm of [CC03]_.
@@ -351,14 +350,13 @@ class IFUCube(object):
 
         """
         try:
-            self.bin_nums
-        except AttributeError:
+            self.results["bin"]
+        except KeyError:
             pass
         else:
             if not clobber:
-                raise AttributeError("``bin_nums`` already exists, use clobber"
-                                     " to overwrite")
-
+                print("bins already exist, use clobber=True to overwrite")
+                return
         print("binning spaxels with Voronoi algorithm with "
               "S/N target of {}".format(target_sn))
 
@@ -416,20 +414,32 @@ class IFUCube(object):
                                           quiet=False, n_cpu=self.n_cpu)
         bin_num, x_node, y_node, x_bar, y_bar, bin_sn, n_pix, scale = res
 
-        # Save the output of voronoi binning (this is a relic)
-        #vor_output = np.column_stack([x, y, sig/noi, bin_num, bin_sn[bin_num],
-        #                              x_bar[bin_num], y_bar[bin_num]])
         vor_output = np.column_stack([x, y, x_bar[bin_num], y_bar[bin_num],
                                       bin_num])
         # Populate the bin_nums dict
         bin_nums = {}
-        for bn in np.sort(np.unique(bin_num)).astype("int"):
+        for i,bn in enumerate(np.sort(np.unique(bin_num)).astype("int"), 1):
+            print("processing bin {}/{}".format(i, len(np.unique(bin_num))),
+                  end="\r")
             idx = vor_output[:,4] == bn
-            x, y, x_bar, y_bar, _bn = vor_output[idx].T
-            bin_nums[bn] = {"spax":(x.astype("int"), y.astype("int")),
-                            "mean":(x_bar, y_bar)}
-        self.bin_nums = bin_nums
+            x, y, x_mean, y_mean, _bn = vor_output[idx].T
+            x, y = x.astype("int"), y.astype("int")
+            x_mean, y_mean = x_mean[0], y_mean[0]
+            nx, ny = self.nucleus
+            distances = ((x - nx)**2 + (y - ny)**2)**0.5
+            bin_nums[bn] = {"spax":(x, y),
+                            "mean":(x_mean, y_mean),
+                            "spec": self._get_bin_spectrum((x,y)),
+                            "dist_min": np.min(distances),
+                            "dist_max": np.max(distances),
+                            "dist_mean": ((x_mean - nx)**2
+                                          + (y_mean - ny)**2)**0.5,
+                            "continuum": {"bad": 0},
+                            "emission": {"bad": 0}}
 
+        self.results["bin"] = bin_nums
+        print()
+        print("found {} bins".format(len(bin_nums)))
 
     def emission_line_bin(self, min_peak_flux, min_frac_flux, max_radius,
                           min_flux, min_npix=8, line_lamb=6562.8, plot=True,
@@ -488,22 +498,22 @@ class IFUCube(object):
            http://www.caha.es/sanchez/HII_explorer/
         """
         try:
-            self.bin_nums
-        except AttributeError:
+            self.results["bin"]
+        except KeyError:
             pass
         else:
             if not clobber:
-                raise AttributeError("``bin_nums`` already exists, use clobber"
-                                     " to overwrite")
+                print("bins already exist, use clobber=True to overwrite")
+                return
 
         if min_flux >= min_peak_flux:
-            print("``min_peak_flux > min_flux`` is required")
+            print("min_peak_flux > min_flux is required")
             return
 
         print("binning spaxels using HII explorer algorithm around emission "
               "line {}".format(line_lamb))
 
-        r = math.ceil(max_radius)
+        r = int(math.ceil(max_radius))
 
         maps = get_line_map(self.data_cube, self.lamb, line_lamb, **kwargs)
         filt_map, cont_map, line_map = maps
@@ -518,23 +528,24 @@ class IFUCube(object):
         peaks[-r:, :] = 0
         peaks[:, :r] = 0
         peaks[:, -r:] = 0
-        # Number of peaks
-        npeaks = len(peaks)
         # Get locations in the map of the peaks and sort decending in flux
         sort_idx = line_map[peaks].argsort()[::-1]
         peak_xy = np.argwhere(peaks)[sort_idx]
+        # Number of peaks
+        n_peaks = len(peak_xy)
         # Keep track of which pixels are allocated to which bin
         bin_map = np.empty(peaks.shape) * np.nan
         bin_nums = {}
-        b = 0 # ensure we have contiguous sequence of bin_numbers
+        bn = 0 # ensure we have contiguous sequence of bin_numbers
         # Starting with the brightest, run the HII explorer algorithm to the
         # map. If a peak is merged with a brighter nearby peak, it is skipped.
-        for xy in peak_xy:
-            x,y = xy
+        for i,xy in enumerate(peak_xy, 1):
+            x,y = map(int, xy)
             # Check if we've already covered this peak
             if ~np.isnan(bin_map[x,y]):
                 #bin_peak_xy[i-1] = np.nan
                 continue
+            print("processing bin seed {}/{}".format(i, n_peaks), end="\r")
             peak_flux = line_map[x,y]
             thresh_flux = max(peak_flux * min_frac_flux, min_flux)
 
@@ -560,38 +571,52 @@ class IFUCube(object):
             bin_cutout[np.where(objs != objs[r,r])] = 0
             if np.sum(bin_cutout) >= min_npix:
                 # Update the bin_map with this bin number
-                bin_map[x-r:x+r+1, y-r:y+r+1][bin_cutout] = b
+                bin_map[x-r:x+r+1, y-r:y+r+1][bin_cutout] = bn
                 # Add a bin entry to our dict
-                bin_nums[b] = {"spax":np.where(bin_map == b)[::-1],
-                               "mean":(x,y)[::-1]}
                 # We swap the x and y to FITS standard in the dict
-                b += 1 # update bin number
-        self.bin_nums = bin_nums
-
-        print("found {} bins".format(len(self.bin_nums)))
+                xy_spax = np.where(bin_map == bn)[::-1]
+                xy_mean = (x,y)[::-1]
+                nx, ny = self.nucleus
+                distances = ((xy_spax[0] - nx)**2
+                                 + (xy_spax[1] - ny)**2)**0.5
+                bin_nums[bn] = {"spax": xy_spax,
+                                "mean": xy_mean,
+                                "spec":self._get_bin_spectrum(xy_spax),
+                                "dist_min": np.min(distances),
+                                "dist_max": np.max(distances),
+                                "dist_mean": ((xy_mean[0] - nx)**2
+                                              + (xy_mean[1] - ny)**2)**0.5,
+                                "continuum": {"bad": 0},
+                                "emission": {"bad": 0}}
+                bn += 1 # update bin number
 
         if plot:
             plt.close()
             binfig, ax = plt.subplots(1,4, sharex=True, sharey=True,
                                       figsize=(16,4),
                                       subplot_kw={"adjustable":"box-forced"})
-            ax[0].imshow(np.sqrt(filt_map), origin="lower",
-                         interpolation="none")
-            ax[0].set_title("Filter")
-            ax[1].imshow(np.sqrt(cont_map), origin="lower",
-                         interpolation="none")
-            ax[1].set_title("Continuum")
-            ax[2].imshow(np.sqrt(line_map), origin="lower",
-                         interpolation="none")
-            ax[2].set_title("Line")
-            ax[3].imshow(bin_map, origin="lower", interpolation="none",
-                         cmap="viridis_r")
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", category=RuntimeWarning)
+                ax[0].imshow(np.sqrt(filt_map), origin="lower",
+                             interpolation="none")
+                ax[0].set_title("Filter")
+                ax[1].imshow(np.sqrt(cont_map), origin="lower",
+                             interpolation="none")
+                ax[1].set_title("Continuum")
+                ax[2].imshow(np.sqrt(line_map), origin="lower",
+                             interpolation="none")
+                ax[2].set_title("Line")
+                ax[3].imshow(bin_map, origin="lower", interpolation="none",
+                             cmap="viridis_r")
             ax[3].set_title("Bins")
             binfig.suptitle("Filter centre at {}\\AA".format(line_lamb))
             binfig.savefig(self.base_name+"_bins_el.pdf", bbox_inches="tight")
 
-    def add_custom_bin(self, centre, r):
+        self.results["bin"] = bin_nums
+        print()
+        print("found {} bins".format(len(bin_nums)))
 
+    def add_custom_bin(self, centre, r):
         """
         Create a custom bin to analyse in addition to the vonoroi bins.
 
@@ -603,7 +628,6 @@ class IFUCube(object):
             Length 2 array giving the x,y centre of the bin
         r : int
             The radius of the bin in pixels.
-
 
         Example
         -------
@@ -617,17 +641,26 @@ class IFUCube(object):
         x_cen, y_cen = centre
         y, x = np.ogrid[-y_cen:self.data_shape[1]-y_cen,
                         -x_cen:self.data_shape[2]-x_cen]
-        dataidx = np.where(x*x + y*y <= r*r)
+        xy_spax = np.where(x*x + y*y <= r*r)[::-1]
 
         bn = -1
-        existing_bins = self._get_bin_nums()
+        existing_bins = self._get_bin_nums("all")
         while True:
             if bn not in existing_bins:
                 break
             bn -= 1
 
-        self.bin_nums[bn] = {"spax":(dataidx[1], dataidx[0]),
-                                  "mean":(x_cen,y_cen)}
+        nx, ny = self.nucleus
+        distances = ((xy_spax[0] - nx)**2 + (xy_spax[1] - ny)**2)**0.5
+        self.results["bin"][bn] = {"spax": xy_spax,
+                                   "mean": (x_cen,y_cen),
+                                   "spec":self._get_bin_spectrum(xy_spax),
+                                   "dist_min": np.min(distances),
+                                   "dist_max": np.max(distances),
+                                   "dist_mean": ((x_cen - nx)**2
+                                                 + (y_cen - ny)**2)**0.5,
+                                   "continuum": {"bad": 0},
+                                   "emission": {"bad": 0}}
         print("added custom bin {} to the list".format(bn))
 
     def get_loc_bin(self, loc):
@@ -647,24 +680,53 @@ class IFUCube(object):
             bin.
         """
         x, y = map(int, loc)
-        for bn in self._get_bin_nums():
-            bn_x, bn_y = self.bin_nums[bn]["spax"]
+        for bn, d in self.results["bin"].items():
+            bn_x, bn_y = d["spax"]
             if x in bn_x and y in bn_y:
                 return bn
         print("didn't find a bin at location {}, {}".format(x,y))
         return None
 
-    def _get_bin_nums(self, custom=False):
+    def _get_bin_nums(self, bins="nobad", custom=False):
         """
-        Return a sorted list of all bin nums or, if custom==True, return
-        a tuple of (bin nums, number of custom bins)
+        Get the bin numbers and, optionally, the number of custom bins
+
+        Parameters
+        ----------
+        bins : str, optional
+            Should be 1) "all", 2) "nocontbad", 3) "nobad".  1) returns all
+            bins present in results["bin"]. 2) returns only those with good
+            continuum fitting. 3) returns only those with good emission and
+            continuum fitting.
+        custom : bool, optional
+            Whether to return the number of custom bins
+
+        Returns
+        -------
+        bin_nums : list or tuple
+            If custom returns tuple of (bin numbers, number custom bins) else
+            returns list of bin numbers
         """
-        bin_nums = np.sort(self.bin_nums.keys())
+        if bins not in ("all", "nocontbad", "nobad"):
+            print("bins must be one of ('all', 'nocontbad', 'nobad')")
+            return
+        bin_nums = np.sort(self.results["bin"].keys())
+        if bins in ("nocontbad", "nobad"):
+            idx_remove = []
+            for i,bn in enumerate(bin_nums):
+                contbad = self.results["bin"][bn]["continuum"]["bad"]
+                emisbad =  self.results["bin"][bn]["emission"]["bad"] * 2
+                bad_value = contbad + emisbad
+                if bad_value != 0 and bins == "nobad":
+                    idx_remove.append(i)
+                elif bad_value not in (0,2) and bins == "nocontbad":
+                    idx_remove.append(i)
+            bin_nums = np.delete(bin_nums, idx_remove)
         if custom:
             return (bin_nums, np.sum(bin_nums < 0))
         return bin_nums
 
-    def get_single_spectrum(self, x, y):
+    def _get_single_spectrum(self, x, y):
         """
         Return the spectrum for spaxel at location ``x``, ``y``.
 
@@ -688,15 +750,15 @@ class IFUCube(object):
 
         return spec
 
-    def get_weighted_spectrum(self, x, y):
+    def _get_weighted_spectrum(self, x, y):
         """
         Return the weighted mean spectrum for spaxels at locations ``x``,
         ``y``.
 
-        Similar to ``get_single_spectrum`` except ``x`` and ``y`` are arrays.
+        Similar to ``_get_single_spectrum`` except ``x`` and ``y`` are arrays.
         The single spectra given by these locations are combined using the
         weighted mean of the fluxes. Returns array of same form as
-        ``get_single_spectrum``.
+        ``_get_single_spectrum``.
 
         """
         # Use weighted arthimetic mean and variance of weighted mean
@@ -711,7 +773,7 @@ class IFUCube(object):
         bad_lamb = num_bad > 0.75 * x.size
 
         # Array to hold final weighted-mean spectrum - same format
-        # as get_single_spectrum()
+        # as _get_single_spectrum()
         spec = np.empty((self.lamb.size, 4))
         spec[:,0] = self.lamb
         # Use masked arrays to cover the nans while preserving shape
@@ -727,35 +789,36 @@ class IFUCube(object):
 
         return spec
 
-    def yield_spectra(self, bin_num):
+    def _get_bin_spectrum(self, xy):
         """
-        Yield the spectrum for a given ``bin_num``.
+        Return the spectrum for coordinates xy.
 
-        If ``bin_num`` is an array, produce a generator to obtain spectra of
-        each. Calls ``get_single_spectrum`` or ``get_weighted_spectrum`` as
-        appropriate (i.e. if number of spaxels in bin is 1 or >1)
+        Calls ``_get_single_spectrum`` or ``_get_weighted_spectrum`` as
+        appropriate (i.e. if number of spaxels in bin is 1 or >1).
+
+        Parameters
+        ----------
+        xy : Nx2 array
+            The ([x0, x1.. xN], [y0, y1, yN]) pixel coordinates of the spectrum
+            to return.
+
+        Returns
+        -------
+        spec : 4xM array
+            see :meth:`ifuanal.IFUCube._get_single_spectrum` and
+            :meth:`ifuanal.IFUCube._get_weighted_spectrum`
         """
-
-        n_bins = len(bin_num)
-        for i,bn in enumerate(bin_num,1):
-            # Get the indices and number of spaxels that are in our chosen bin
-            x_spax, y_spax = self.bin_nums[bn]["spax"]
-            spaxels_num = len(x_spax)
-            print("Calculating weighted mean of {:>3} spaxels in bin {:>5} "
-                  "({:>5}/{:>5})".format(spaxels_num, bn, i, n_bins), end="\r")
-
-            if spaxels_num == 0:
-                raise ValueError("No spaxels found in bin number: "
-                                 "{}".format(bin_num))
-            elif spaxels_num == 1:
-                # yield the single spaxel's spectrum
-                spec = self.get_single_spectrum(x_spax, y_spax)
-            else:
-                # yield the weighted spectrum of these positions
-                spec = self.get_weighted_spectrum(x_spax,y_spax)
-            yield spec
-
-
+        n_spax = len(xy[0])
+        if n_spax == 0:
+            print("no spaxels found!")
+            return None
+        elif n_spax == 1:
+            # yield the single spaxel's spectrum
+            spec = self._get_single_spectrum(xy[0], xy[1])
+        else:
+            # yield the weighted spectrum of these positions
+            spec = self._get_weighted_spectrum(xy[0], xy[1])
+        return spec
 
     def run_starlight(self, bin_num=None, base_name="bc03", lamb_low=5590.,
                       lamb_upp=5680., use_tmp_dir=None, clobber=False,
@@ -781,18 +844,14 @@ class IFUCube(object):
         lamb_low, lamb_upp : float, optional
             The wavelength limits over which starlight will calculate the S/N.
             This isn't actually used since we have a stddev cube but the limits
-            must be within the wavelengh range of the cube anyway (defaults
-            to 5590.->5680.).
+            must be within the wavelengh range of the cube anyway.
         use_tmp_dir: None or str, optional
             The temporary directory where the resampled bases and output will
             be stored. If None a safe temporary directory will be made. A
             previous temporary directory used can be given and the resampled
             bases in there will be used (defaults to None).
         clobber : bool, optional
-            Whether to overwrite the `_sloutput.txt` output if it exists. If
-            this file exists and ``clobber = False`` then its contents are read
-            and ``parse_starlight`` will use the pre-existing output files
-            (defaults to False).
+            Whether to overwrite pre-existing results.
         append : bool, optional
             NOT IMPLEMENTED YET. (Allow method to overwrite sl_output only for
             ``bin_num`` and append these to the output rather than overwrite) -
@@ -800,35 +859,24 @@ class IFUCube(object):
         """
         print("running starlight fitting")
 
-        if not clobber and not append:
-            try:
-                f = open(self.base_name+"_sloutputs.txt", "r")
-            except IOError:
-                print("didn't find existing starlight output file.")
-            else:
-                print("found {}".format(self.base_name+"_sloutputs.txt"))
-                self.sl_output = {}
-                for line in f:
-                    if line.startswith("#"):
-                        continue
-                    bn, of, sf = line.split()
-                    if of == "None":
-                        of = None
-                    self.sl_output[int(bn)] = [of, sf]
-                return
-        elif clobber and append:
-            print("can't `clobber` *and* `append`")
-            return
-        elif not clobber and append:
-            pass
-            #TODO
-
         if bin_num is None:
-            bin_num = self._get_bin_nums()
+            bin_num = self._get_bin_nums("all")
         elif isinstance(bin_num, (int,float)):
             bin_num = [bin_num]
-        if not np.all(np.in1d(bin_num, self._get_bin_nums())):
-            raise ValueError(">=1 bin numbers given do not exist")
+        if not np.all(np.in1d(bin_num, self._get_bin_nums("all"))):
+            raise ValueError("one or more bin numbers given do not exist")
+
+        if not clobber:
+            for bn in bin_num:
+                try:
+                    self.results["bin"]["continuum"]["sl_output"]
+                except KeyError:
+                    pass
+                else:
+                    print("previous results found. use clobber=True to "
+                          "overwrite.")
+                    return
+
         print("fitting {} bins...".format(len(bin_num)))
         if use_tmp_dir:
             sl_tmp_dir = os.path.join(use_tmp_dir,"")
@@ -853,16 +901,15 @@ class IFUCube(object):
                 print("resampling base files {:>4}/{:4}".format(i,Nbasefiles),
                       end="\r")
                 resample_base(basefile, self.lamb, self.delta_lamb)
-        print()
+            print()
         # Compute the spectra and write the spectrum to a temp file
-        spectra = self.yield_spectra(bin_num)
         spec_files = []
-        for spec in spectra:
+        for bn in bin_num:
             with tempfile.NamedTemporaryFile(prefix="spec_",dir=sl_tmp_dir,
                                              delete=False) as spec_file:
-                np.savetxt(spec_file, spec, fmt="%14.8f")
+                np.savetxt(spec_file, self.results["bin"][bn]["spec"],
+                           fmt="%14.8f")
                 spec_files.append(spec_file.name)
-        print()
         # multiprocessing params for starlight pool of workers
         p = mp.Pool(self.n_cpu)
         bin_out_files = p.map(fit_starlight,
@@ -878,119 +925,300 @@ class IFUCube(object):
         p.join()
         print("STARLIGHT fits of {} bins complete".format(len(bin_num)))
 
-        #TODO
-        #if append:
-        #    file_mode = "a"
-        #else:
-        #    file_mode = "w"
-        #if clobber:
-        #    self.sl_output = {}
-        with open(self.base_name+"_sloutputs.txt", "w") as f: #"w"->file_mode?
-            f.write("# bin starlight_file\n")
-            for bn, of, sf in bin_out_files:
-                self.sl_output[int(bn)] = [of, sf]
-                f.write("{:>5} {} {}\n".format(bn, of, sf))
+        for bn, outfile in bin_out_files:
+            self.results["bin"][bn]["continuum"]["sl_output"] = outfile
 
+        self._parse_continuum(bin_num)
 
-    def parse_results(self, bin_num=None, clobber=False):
+    def _parse_continuum(self, bin_num=None):
         """
-        Creates and pickles a dictionary containing all results.
-
-        The ``results`` dictionary is created by parsing the starlight output
-        files (see ``run_starlight``) and copying other properties (e.g.
-        ``nucleus``). The dictionary is pickled to file with suffix
-        `_results.pkl`.
+        Parses the output from STARLIGHT and populates the results dict.
 
         Parameters
         ----------
-        clobber : bool, optional
-            If ``clobber`` is not ``True`` and ``results`` exists, then it will not
-            do the parsing.
+        bin_num : (None, int or array_like), optional
+            The bin numbers to parse STARLIGHT results for (defaults to None,
+            this will parse all bins).
         """
-
         print("parsing results")
-        if self.results is not None and not clobber:
-            print("`results` dict exists, use clobber=True to overwrite")
-            return
-        try:
-            self.bin_nums
-        except AttributeError:
-            raise("``bin_nums`` not found, run a binning routine first")
         if bin_num is None:
-            bin_num = self._get_bin_nums()
+            bin_num = self._get_bin_nums("all")
         elif isinstance(bin_num, (int,float)):
             bin_num = [bin_num]
-        if not np.all(np.in1d(bin_num, self._get_bin_nums())):
-            raise ValueError(">=1 bin numbers given do not exist")
-
-        tmp_dir = os.path.dirname(self.sl_output[bin_num[0]][0])
-        if not os.path.isdir(tmp_dir):
-            print("{} does not exist, cannot parse results.".format(tmp_dir))
+        if not np.all(np.in1d(bin_num, self._get_bin_nums("all"))):
+            print("one or more bin numbers given do not exist")
             return
 
-        self.results = {}
-
-        # Populate bin entries in advance
-        self.results["bin"] = dict.fromkeys(bin_num)
         n_bins = len(bin_num)
         for i, bn in enumerate(bin_num, 1):
             print("parsing starlight output {:5}/{:5}".format(i, n_bins),
                   end="\r")
-            if self.sl_output[bn][0] is not None:
-                self.results["bin"][bn] = parse_starlight(self.sl_output[bn][0])
-                if self.results["bin"][bn] is None: #i.e. failed to get Nl_Obs
-                    print("removing bin {}, failed to parse {}"
-                          .format(bn, self.sl_output[bn][0]))
-                    self.results["bin"].pop(bn)
-                    self.bin_nums.pop(bn)
+            bin_res = self.results["bin"][bn]["continuum"]
+            if bin_res["sl_output"] is not None:
+                try:
+                    open(bin_res["sl_output"])
+                except IOError:
+                    print("couldn't open {} for bin {}"
+                          .format(bin_res["sl_output"], bn))
                     continue
-                self.results["bin"][bn]["spec"] = np.genfromtxt(
-                                                      self.sl_output[bn][1])
-                x_spax, y_spax = self.bin_nums[bn]["spax"]
-                self.results["bin"][bn]["x_spax"] = x_spax
-                self.results["bin"][bn]["y_spax"] = y_spax
-                x_bar, y_bar = self.bin_nums[bn]["mean"]
-                self.results["bin"][bn]["x_bar"] = x_bar
-                self.results["bin"][bn]["y_bar"] = y_bar
-                if self.nucleus is not None:
-                    nx, ny = self.nucleus[0], self.nucleus[1]
-                    distances = ((x_spax - nx)**2
-                                 + (y_spax - ny)**2)**0.5
-                    self.results["bin"][bn]["dist_min"] = np.min(distances)
-                    self.results["bin"][bn]["dist_max"] = np.max(distances)
-                    self.results["bin"][bn]["dist_bar"] = ((x_bar - nx)**2 +
-                                                           (y_bar - ny)**2)**0.5
-
-                else:
-                    self.results["bin"][bn]["dist_min"] = None
-                    self.results["bin"][bn]["dist_max"] = None
-                    self.results["bin"][bn]["dist_bar"] = None
+                sl_results = parse_starlight(bin_res["sl_output"])
+                if sl_results is None: #i.e. failed to get Nl_Obs
+                    print("failed to parse {} for bin {}"
+                          .format(bin_res["sl_output"], bn))
+                    bin_res["bad"] = 1
+                    continue
+                bin_res.update(sl_results)
             else:
-                print("removing bin {}, No sl_output found".format(bn))
-                self.results["bin"].pop(bn)
-                self.bin_nums.pop(bn)
+                print("no sl_output found for bin {}".format(bn))
+                bin_res["bad"] = 1
+
+    def run_emission_lines(self, bin_num=None, vd_init=[10.,40.,70.,100.],
+                           v0_init=[-300,-200,-100,0,100,200,300],
+                           amp_init=[0.1,1.,10.], stddev_bounds=[5.,120.],
+                           offset_bounds=[-500.,500.], weights=True,
+                           clobber=False):
+        """
+        Fit emission lines in the continuum-subtracted spectra with gaussians.
+
+        Based on the contents of `data/emission_lines.json`, a series of
+        gaussians will be fit to those emission lines.  The fitting is
+        performed in a brute force manner over a range of initial guesses to
+        attempt to find the global minimum. As such, increasing the length of
+        the initial guesses for the width, mean and amplitude (``vd_init``,
+        ``v0_init`` and ``amp_init`` respectively) will dramatically increase
+        computing time.
+
+        Parameters
+        ----------
+        bin_num : (None, int or array_like), optional
+            The bin numbers to fit (defaults to None, this will
+            fit all bins where continuum fitting was sucessful)
+        vd_init : list
+            The intial guess(es) for the velocity dispersion of the lines in
+            km/s. If None will use initial guesses of 10, 40, 70 and 100 km/s.
+        v0_init : list or "vstar"
+            The intial guess(es) for the velocity offset of the lines in
+            km/s. The special case "vstar" will use the velocty offset
+            determined by STARLIGHT and construct 6 guesses over the range
+            +/-200 km/s of that value, but limited to within ``offset_bounds``
+            of zero offset.
+        amp_init : list
+            The initial guess(es) for the amplitudes of the lines in units of
+            ``fobs_norm`` (see starlight manual).
+        stddev_bounds : list
+            Bounding limits for the sigma widths of the lines in km/s.
+        offset_bounds : list
+            Bounding limits for the offset of the mean of the lines in km/s.
+        weights : bool
+            Whether to include weights (1/stddev**2) in the fitting and chi2
+            determination.
+        clobber : bool, optional
+            Whether to overwrite pre-existing results.
+        """
+        if bin_num is None:
+            bin_num = self._get_bin_nums("nocontbad")
+        elif isinstance(bin_num, (int,float)):
+            bin_num = [bin_num]
+        if not np.all(np.in1d(bin_num, self._get_bin_nums("nocontbad"))):
+            print("one or more bins have bad continuum fitting or don't exist")
+            return
+
+        if not clobber:
+            for bn in bin_num:
+                try:
+                    self.results["bin"]["emission"]["chi2dof"]
+                except KeyError:
+                    pass
+                else:
+                    print("previous results found. use clobber=True to "
+                          "overwrite.")
+                    return
+
+        print("fitting emission lines to {} bins...".format(len(bin_num)))
+        # multiprocessing params for emission line fitting pool of workers
+        p = mp.Pool(self.n_cpu)
+        emline_results = p.map(fit_emission_lines,
+                               zip(bin_num,
+                                   [self.results["bin"][bn] for bn in bin_num],
+                                   repeat(self._emission_lines),
+                                   repeat(vd_init),
+                                   repeat(v0_init),
+                                   repeat(amp_init),
+                                   repeat(stddev_bounds),
+                                   repeat(offset_bounds),
+                                   repeat(weights)))
+        p.close()
+        p.join()
+        print()
+        print("emission line fitting complete")
+        for bn, emline_res in emline_results:
+            self.results["bin"][bn]["emission"] = emline_res
+
+        self._parse_emission(bin_num)
+
+    def _parse_emission(self, bin_num=None):
+        """
+        Calculate useful quantities from the fitted emission line model.
+
+        The values are calculated for each bin in ``bin_num`` and are based
+        on the emission line models produced by run_emission_lines().
+
+        Parameters
+        ----------
+        bin_num : (None, int or array_like), optional
+            The bin numbers to get equivalent widths for (defaults to None,
+            this will fit all bins where continuum fitting was sucessful)
+        """
+
+        if bin_num is None:
+            bin_num = self._get_bin_nums("nocontbad")
+        elif isinstance(bin_num, (int,float)):
+            bin_num = [bin_num]
+        if not np.all(np.in1d(bin_num, self._get_bin_nums("nocontbad"))):
+            print("one or more bins have bad continuum fitting or don't exist")
+
+        n_bins = len(bin_num)
+        for i,bn in enumerate(bin_num,1):
+            print("parsing emission model {:>5}/{:5}".format(i, n_bins),
+                  end="\r")
+            bin_res = self.results["bin"][bn]["emission"]
+            bin_res_c = self.results["bin"][bn]["continuum"]
+            try:
+                emlines = bin_res["lines"]
+            except KeyError:
+                print("skipping bin {}, no emission line results found"
+                      .format(bn))
+                continue
+            # Determine fluxes, EW and FWHM for each line
+            for line, fit  in emlines.items():
+                amp, mean, stddev = fit["fit_params"]
+                amp_sig, mean_sig, stddev_sig = fit["fit_uncerts"]
+
+                flux = (2*math.pi)**0.5 * stddev * amp
+                flux_uncert = ((2*math.pi) * ((stddev_sig**2 * amp**2)
+                                              + (stddev**2 * amp_sig**2)))**0.5
+
+                # Find the lambda index of our line's mean and get the
+                # value of the continuum there for EW calculation
+                lamb_idx = np.abs(self.lamb - mean).argmin()
+                cont = bin_res_c["sl_spec"][lamb_idx, 2] * bin_res_c["fobs_norm"]
+                # TODO turn these into quantities based on prim_head
+                # (i.e. in Ang, km/s etc).
+                emlines[line]["flux"] = flux
+                emlines[line]["flux_uncert"] = flux_uncert
+                emlines[line]["snr"] = flux/flux_uncert
+                emlines[line]["ew"] = flux/cont
+                emlines[line]["ew_uncert"] = flux_uncert/cont
+                to_fwhm = lambda x: x * 2 * (2*math.log(2))**0.5
+                emlines[line]["fwhm"] = to_fwhm(stddev)
+                emlines[line]["fwhm_uncert"] = to_fwhm(stddev_sig)
+                emlines[line]["offset"] = mean - emlines[line]["rest_lambda"]
+
+            # Determine metallcities where possible using SNR>3 lines only
+            if (emlines["Halpha_6563"]["snr"] > 3 and
+                emlines["[NII]_6583"]["snr"] > 3):
+                N2 = (np.log10(emlines["[NII]_6583"]["flux"]
+                               / emlines["Halpha_6563"]["flux"]))
+            else:
+                N2 = np.nan
+            if (emlines["[OIII]_5007"]["snr"] > 3 and
+                emlines["Hbeta_4861"]["snr"] > 3):
+                O3N2 = np.log10((emlines["[OIII]_5007"]["flux"]
+                                 / emlines["Hbeta_4861"]["flux"])
+                                / (10**N2))
+            else:
+                O3N2 = np.nan
+            if (emlines["[SII]_6716"]["snr"] > 3 and
+                emlines["[SII]_6731"]["snr"] > 3 and
+                emlines["[NII]_6583"]["snr"] > 3):
+                N2S2 = np.log10(emlines["[NII]_6583"]["flux"]
+                                / (emlines["[SII]_6716"]["flux"]
+                                   + emlines["[SII]_6731"]["flux"]))
+            else:
+                N2S2 = np.nan
+            bin_res["metallicity"] = {}
+            bin_res["metallicity"]["PP04_N2"] = 8.90 + 0.57 * N2
+            bin_res["metallicity"]["PP04_O3N2"] = 8.73 - 0.32 * O3N2
+            bin_res["metallicity"]["M13"] = 8.533 - 0.214 * O3N2
+            bin_res["metallicity"]["D16"] = 8.77 + N2S2 + 0.264 * N2
+
+    def make_emission_line_cube(self, clobber=False):
+        """
+        Subtract starlight continuum fits from data and save the cube.
+
+        Where binning has been performed, the individual spectra are replaced
+        by the binned spectrum. The emission line cube is saved with suffix
+        `_emissionline.fits`.
+
+        Parameters
+        ----------
+        clobber : bool, optional
+            Whether to overwrite an existing emission line cube.
+        """
+        outfile = self.base_name+"_emissionline.fits"
+        if not clobber and os.path.isfile(outfile):
+                print("{} exists and clobber is false".format(outfile))
+                return
+
+        # make a dummy cube to hold the emission line spectra
+        emission_line_cube = np.empty(self.data_cube.shape) * np.nan
+        for bn in self._get_bin_nums("nocontbad"):
+            bin_res = self.results["bin"][bn]
+            if bin_res["bad"] == 1:
+                continue
+            # subtract the synthetic spectrum from the data and account for
+            # normalisation in starlight
+            emission_line_spec = ((bin_res["continuum"]["sl_spec"][:,1]
+                                   - bin_res["continuum"]["sl_spec"][:,2])
+                                  * bin_res["continuum"]["fobs_norm"])
+            for x, y in zip(*bin_res["spax"]):
+                emission_line_cube[:,y,x] = emission_line_spec
+
+        hdulist = fits.HDUList()
+        hdulist.append(fits.ImageHDU(data = emission_line_cube,
+                                     header=self.data_cube.header))
+        hdulist.append(fits.ImageHDU(data = self.stddev_cube.data,
+                                     header=self.stddev_cube.header))
+        hdulist.writeto(outfile, clobber=clobber)
+
+        print("emission line cube saved to {}".format(outfile))
+
+    def make_continuum_cube(self):
+        """
+        Subtract the emission line model from each bin to produce a continuum
+        cube.
+
+        To be implemented.
+        """
+        pass
+        #print("continuum cube saved to {}".format(outfile))
 
     def plot_continuum(self, bin_num):
         """
         Plot the spectrum and results of starlight continuum fitting for
         ``bin_num``
-
         """
-        res = self.results["bin"][bin_num]
+        x_mean, y_mean = self.results["bin"][bin_num]["mean"]
+        bin_res = self.results["bin"][bin_num]["continuum"]
+
+        if bin_res["bad"]:
+            print("bad continuum fitting for bin {}, skipping plotting"
+                  .format(bin_num))
+            return
 
         # Get the data we want to plot:
-        lamb = res["sl_spec"][:,0]
-        obs = np.ma.masked_array(res["sl_spec"][:,1],
-                                 mask=res["sl_spec"][:,1] < 0)
-        syn = res["sl_spec"][:,2]
+        lamb = bin_res["sl_spec"][:,0]
+        obs = np.ma.masked_array(bin_res["sl_spec"][:,1],
+                                 mask=bin_res["sl_spec"][:,1] < 0)
+        syn = bin_res["sl_spec"][:,2]
         resid = obs - syn
-        err = np.ma.masked_array(1/res["sl_spec"][:,3],
-                                 mask=res["sl_spec"][:,3] < 0)
-        masked = np.ma.masked_array(resid, mask=res["sl_spec"][:,3] == 0)
+        err = np.ma.masked_array(1/bin_res["sl_spec"][:,3],
+                                 mask=bin_res["sl_spec"][:,3] < 0)
+        masked = np.ma.masked_array(resid, mask=bin_res["sl_spec"][:,3] == 0)
         slice_idxs = [(s.start,s.stop-1) for s in np.ma.clump_masked(masked)]
-        clipped = np.ma.masked_array(resid, mask=res["sl_spec"][:,3] > -1)
+        clipped = np.ma.masked_array(resid, mask=bin_res["sl_spec"][:,3] > -1)
 
-        b = res["bases"]
+        b = bin_res["bases"]
         Z = np.sort(np.unique(b[:,5]))
         zages = []
         lightweights = []
@@ -1024,15 +1252,13 @@ class IFUCube(object):
             axresid.axvspan(self.lamb[idx[0]], self.lamb[idx[1]], color=MASKCOL,
                          alpha=0.3)
         axresid.set_xlim(np.min(lamb),np.max(lamb))
-        axresid.set_xlabel("Wavelength "
-                           "[{}]".format(self.lamb_units.to_string()))
+        axresid.set_xlabel("Wavelength [{}]"
+                           .format(self.lamb_units.to_string()))
         axresid.set_ylabel("Residual")
         axresid.set_yticks([-0.2,0.0,0.2,0.4,0.6])
         axresid.set_ylim(-0.3,0.7)
 
-
-        # Plot the contribution of the SSPs to the population (hideously
-        # written!)
+        # Plot the contribution of the SSPs to the population
         axlight = slfig.add_subplot(gs[:2,1])
         axmass = slfig.add_subplot(gs[2:,1], sharex=axlight)
         bottoml, bottomm = np.zeros(len(zages[0])), np.zeros(len(zages[0]))
@@ -1053,7 +1279,6 @@ class IFUCube(object):
         axlight.set_ylim(0,80)
         plt.setp(axlight.get_xticklabels(), visible=False) # we share the x axis
 
-
         axmass.set_yscale("log")
         axmass.set_ylim(0.1,105)
         yformatter = ticker.FuncFormatter(
@@ -1066,40 +1291,19 @@ class IFUCube(object):
         axmass.set_ylabel("Mcor$_\\textrm{{j}}$ [\%]")
 
         slfig.text(0.15, 1.0, "$\chi^{{2}}/\\textrm{{dof}} = {:.3f}$, "
-                   "$\\bar{{x}} = {:.2f}$, $\\bar{{y}} = {:.2f}$".format(
-                   res["chi2/Nl_eff"], res["x_bar"], res["y_bar"]),color="k",
-                   size=12)
+                   "$\\bar{{x}} = {:.2f}$, $\\bar{{y}} = {:.2f}$"
+                   .format(bin_res["chi2/Nl_eff"], x_mean, y_mean),
+                   color="k", size=12)
 
         slfig.text(0.15, 0.96, "A$_\\textrm{{v}} = {:5.3f}$, $\\sigma_\\star = "
                    "{:6.2f}$ km s$^{{-1}}$, $v_\\star = {:6.2f}$ km "
-                   "s$^{{-1}}$".format( res["AV_min"], res["vd_min"],
-                   res["v0_min"]), color="k", size=12)
+                   "s$^{{-1}}$".format(bin_res["AV_min"], bin_res["vd_min"],
+                   bin_res["v0_min"]), color="k", size=12)
         slfig.tight_layout()
         slfig.subplots_adjust(hspace=0.1)
         slfig.savefig(self.base_name+"_sl_fit_{}.png".format(bin_num),
                       bbox_inches="tight", dpi=300, additional_artists=(lgnd,))
         print("plot saved to {}_sl_fit_{}.png".format(self.base_name, bin_num))
-
-    def plot_worst_fits(self, N=5):
-        """
-        Find the N bins with the worst chi2 from the starlight and emission
-        line fits.  Plot both fits for these bins.
-
-        """
-        d = self.results["bin"]
-        worst_sl_bins = sorted(d.iterkeys(),
-                               key=(lambda key:
-                                    d[key]["chi2/Nl_eff"]))[-N:]
-        print("worst continuum fitted bins: {}".format(worst_sl_bins))
-        worst_el_bins = sorted(d.iterkeys(),
-                               key=(lambda key:
-                                    d[key]["emline_res"]["chi2dof"]))[-N:]
-        print("worst emission line fitted bins: {}".format(worst_el_bins))
-        worst_bins = set(worst_sl_bins + worst_el_bins)
-        for wb in worst_bins:
-            self.plot_continuum(wb)
-            self.plot_emission(wb)
-
 
     def plot_yio(self, age1=5e8, age2=5e9):
         """
@@ -1125,17 +1329,18 @@ class IFUCube(object):
                    str(int(age1/1e9))+" Gyr"
         age2_str = str(int(age2/1e6))+" Myr" if age2<1e9 else \
                    str(int(age2/1e9))+" Gyr"
-        for b in self.results["bin"]:
-            r = self.results["bin"][b]
-            yngidx = r["bases"][:,4] <= age1
-            intidx = (age1 < r["bases"][:,4]) & (r["bases"][:,4] < age2)
-            oldidx = r["bases"][:,4] >= age2
-            ynglightfrac = np.sum(r["bases"][yngidx,1])
-            intlightfrac = np.sum(r["bases"][intidx,1])
-            oldlightfrac = np.sum(r["bases"][oldidx,1])
-            young[r["y_spax"],r["x_spax"]] = ynglightfrac
-            inter[r["y_spax"],r["x_spax"]] = intlightfrac
-            old[r["y_spax"],r["x_spax"]] = oldlightfrac
+        for bn in self._get_bin_nums("nocontbad"):
+            bin_res = self.results["bin"][bn]
+            yngidx = bin_res["continuum"]["bases"][:,4] <= age1
+            intidx = ((age1 < bin_res["continuum"]["bases"][:,4])
+                      & (bin_res["continuum"]["bases"][:,4] < age2))
+            oldidx = bin_res["continuum"]["bases"][:,4] >= age2
+            ynglightfrac = np.sum(bin_res["continuum"]["bases"][yngidx,1])
+            intlightfrac = np.sum(bin_res["continuum"]["bases"][intidx,1])
+            oldlightfrac = np.sum(bin_res["continuum"]["bases"][oldidx,1])
+            young[bin_res["spax"][::-1]] = ynglightfrac
+            inter[bin_res["spax"][::-1]] = intlightfrac
+            old[bin_res["spax"][::-1]] = oldlightfrac
 
         plt.close("all")
         axyoung = plt.subplot(311, adjustable="box-forced")
@@ -1145,7 +1350,6 @@ class IFUCube(object):
         plt.plot(self.nucleus[0], self.nucleus[1], "kx", markersize=10)
         plt.title("Age$_\\star <$ {}".format(age1_str))
         plt.colorbar(label="x$_\\textrm{j}$ [\%]")
-
 
         axinter = plt.subplot(312, sharex=axyoung, sharey=axyoung,
                               adjustable="box-forced")
@@ -1194,14 +1398,14 @@ class IFUCube(object):
             if bn is None:
                 print("nucleus is not in a bin")
                 return
-            norm_v0 = self.results["bin"][bn]["v0_min"]
+            norm_v0 = self.results["bin"][bn]["continuum"]["v0_min"]
         elif not isinstance(norm_v0, (float,int)):
             print("norm_v0 must be 'nucleus' or a float/int")
             return
-        for b in self.results["bin"]:
-            r = self.results["bin"][b]
-            v0[r["y_spax"],r["x_spax"]] = r["v0_min"] - norm_v0
-            vd[r["y_spax"],r["x_spax"]] = r["vd_min"]
+        for bn in self._get_bin_nums("nocontbad"):
+            bin_res = self.results["bin"][bn]
+            v0[bin_res["spax"][::-1]] = bin_res["continuum"]["v0_min"] - norm_v0
+            vd[bin_res["spax"][::-1]] = bin_res["continuum"]["vd_min"]
 
         plt.close("all")
         v0min, v0max = np.nanmin(v0), np.nanmax(v0)
@@ -1224,163 +1428,6 @@ class IFUCube(object):
         plt.savefig(self.base_name+"_kinematics.pdf", bbox_inches="tight")
         print("plot saved to {}".format(self.base_name+"_kinematics.pdf"))
 
-    def run_emission_lines(self, bin_num=None, vd_init=[10.,40.,70.,100.],
-                           v0_init=[-300,-150,-50,0,50,150,300],
-                           amp_init=[0.1,1.,10.], stddev_bounds=[5.,120.],
-                           offset_bounds=[-500.,500.], weights=True):
-        """
-        Fit emission lines in the continuum-subtracted spectra with gaussians.
-
-        Based on the contents of `data/emission_lines.json` (NOT AMENDABLE AT
-        PRESENT!), a series of gaussians will be fit to those emission lines.
-        The fitting is performed in a brute force manner over a range of
-        initial guesses to attempt to find the global minimum. As such,
-        increasing the length of the initial guesses for the width, mean and
-        amplitude (``vd_init``, ``v0_init`` and ``amp_init`` respectively) will
-        dramatically increase computing time.
-
-        Parameters
-        ----------
-        bin_num : (None, int or array_like), optional
-            The bin numbers to fit (defaults to None, this will
-            fit all bins)
-        vd_init : list
-            The intial guess(es) for the velocity dispersion of the lines in
-            km/s. If None will use initial guesses of 10, 40, 70 and 100 km/s.
-        v0_init : list or "vstar"
-            The intial guess(es) for the velocity offset of the lines in
-            km/s. The special case "vstar" will use the velocty offset
-            determined by STARLIGHT and construct 6 guesses over the range
-            +/-200 km/s of that value, but limited to within ``offset_bounds``
-            of zero offset.
-        amp_init : list
-            The initial guess(es) for the amplitudes of the lines in units of
-            ``fobs_norm`` (see starlight manual).
-        stddev_bounds : list
-            Bounding limits for the sigma widths of the lines in km/s.
-        offset_bounds : list
-            Bounding limits for the offset of the mean of the lines in km/s.
-        weights : bool
-            Whether to include weights (1/stddev**2) in the fitting and chi2
-            determination.
-        """
-        #TODO will need to estimate S/N of lines using noise underlying the
-        #     line positions and set any S/N < 3, say, to upper limits for
-        #     purposes of Z calculations etc.
-        if bin_num is None:
-            bin_num = self._get_bin_nums()
-        elif isinstance(bin_num, (int,float)):
-            bin_num = [bin_num]
-        if not np.all(np.in1d(bin_num, self._get_bin_nums())):
-            raise ValueError(">=1 bin numbers given do not exist")
-        print("fitting emission lines to {} bins...".format(len(bin_num)))
-
-        # multiprocessing params for emission line fitting pool of workers
-        p = mp.Pool(self.n_cpu)
-        emline_results = p.map(fit_emission_lines,
-                               zip(bin_num,
-                                   [self.results["bin"][bn] for bn in bin_num],
-                                   repeat(self._emission_lines),
-                                   repeat(vd_init),
-                                   repeat(v0_init),
-                                   repeat(amp_init),
-                                   repeat(stddev_bounds),
-                                   repeat(offset_bounds),
-                                   repeat(weights)))
-        p.close()
-        p.join()
-        print()
-        print("emission line fitting complete")
-        for bn, emline_res in emline_results:
-            self.results["bin"][bn]["emline_res"] = emline_res
-
-
-    def parse_emission(self, bin_num=None):
-        """
-        Calculate useful quantities from the fitted emission line model.
-
-        The values are calculated for each bin in ``bin_num`` and are based
-        on the emission line models produced by run_emission_line(). Follows
-        the formal definintion of emission=negative_ew, absoption=positive_ew).
-
-        Parameters
-        ----------
-        bin_num : (None, int or array_like), optional
-            The bin numbers to get equivalent widths for (defaults to None,
-            this will fit all bins)
-        """
-        if bin_num is None:
-            bin_num = self._get_bin_nums()
-        elif isinstance(bin_num, (int,float)):
-            bin_num = [bin_num]
-        if not np.all(np.in1d(bin_num, self._get_bin_nums())):
-            raise ValueError(">=1 bin numbers given do not exist")
-
-        n_bins = len(bin_num)
-        for i,bn in enumerate(bin_num,1):
-            print("parsing emission model {:>5}/{:5}".format(i, n_bins),
-                  end="\r")
-            bin_res = self.results["bin"][bn]
-            try:
-                emlines = bin_res["emline_res"]["lines"]
-            except KeyError:
-                print("skipping bin {}, no emission line results found"
-                      .format(bn))
-                continue
-            # Determine fluxes, EW and FWHM for each line
-            for line, fit  in emlines.items():
-                amp, mean, stddev = fit["fit_params"]
-                amp_sig, mean_sig, stddev_sig = fit["fit_uncerts"]
-
-                flux = (2*math.pi)**0.5 * stddev * amp
-                flux_uncert = ((2*math.pi)**0.5 * ((stddev_sig * amp)**2
-                                                   + (stddev * amp_sig)**2)**0.5)
-
-                # Find the lambda index of our line's mean and get the
-                # value of the continuum there for EW calculation
-                lamb_idx = np.abs(self.lamb - mean).argmin()
-                cont = bin_res["sl_spec"][lamb_idx, 2] * bin_res["fobs_norm"]
-                # TODO turn these into quantities based on prim_head
-                # (i.e. in Ang, km/s etc).
-                emlines[line]["flux"] = flux
-                emlines[line]["flux_uncert"] = flux_uncert
-                emlines[line]["snr"] = flux/flux_uncert
-                emlines[line]["ew"] = flux/cont
-                emlines[line]["ew_uncert"] = flux_uncert/cont
-                to_fwhm = lambda x: x * 2 * (2*math.log(2))**0.5
-                emlines[line]["fwhm"] = to_fwhm(stddev)
-                emlines[line]["fwhm_uncert"] = to_fwhm(stddev_sig)
-                emlines[line]["offset"] = mean - emlines[line]["rest_lambda"]
-
-            # Determine metallcities where possible using SNR>3 lines only
-            if (emlines["Halpha_6563"]["snr"] > 3 and
-                emlines["[NII]_6583"]["snr"] > 3):
-                N2 = (np.log10(emlines["[NII]_6583"]["flux"]
-                               / emlines["Halpha_6563"]["flux"]))
-            else:
-                N2 = np.nan
-            if (emlines["[OIII]_5007"]["snr"] > 3 and
-                emlines["Hbeta_4861"]["snr"] > 3):
-                O3N2 = np.log10((emlines["[OIII]_5007"]["flux"]
-                                 / emlines["Hbeta_4861"]["flux"])
-                                / (10**N2))
-            else:
-                O3N2 = np.nan
-            if (emlines["[SII]_6716"]["snr"] > 3 and
-                emlines["[SII]_6731"]["snr"] > 3 and
-                emlines["[NII]_6583"]["snr"] > 3):
-                N2S2 = np.log10(emlines["[NII]_6583"]["flux"]
-                                / (emlines["[SII]_6716"]["flux"]
-                                   + emlines["[SII]_6731"]["flux"]))
-            else:
-                N2S2 = np.nan
-            bin_res["metallicity"] = {}
-            bin_res["metallicity"]["PP04_N2"] = 8.90 + 0.57 * N2
-            bin_res["metallicity"]["PP04_O3N2"] = 8.73 - 0.32 * O3N2
-            bin_res["metallicity"]["M13"] = 8.533 - 0.214 * O3N2
-            bin_res["metallicity"]["D16"] = 8.77 + N2S2 + 0.264 * N2
-
-
     def plot_emission(self, bin_num):
         """
         Plot the residual emission line spectrum and results of emission
@@ -1389,15 +1436,16 @@ class IFUCube(object):
         """
         bin_res = self.results["bin"][bin_num]
 
-        lamb = bin_res["sl_spec"][:,0]
+        lamb = bin_res["continuum"]["sl_spec"][:,0]
         mask = bin_res["spec"][:,3] == 2
 
-        emline_obs = np.ma.masked_array((bin_res["sl_spec"][:,1] -
-                                         bin_res["sl_spec"][:,2]) *
-                                        bin_res["fobs_norm"], mask=mask)
+        emline_obs = np.ma.masked_array((bin_res["continuum"]["sl_spec"][:,1] -
+                                         bin_res["continuum"]["sl_spec"][:,2]) *
+                                        bin_res["continuum"]["fobs_norm"],
+                                        mask=mask)
         emline_uncert = np.ma.masked_array(bin_res["spec"][:,2], mask=mask)
         emline_model = _get_emline_model(self._emission_lines,
-                                         bin_res["emline_res"])
+                                         bin_res["emission"])
 
         plt.close("all")
 
@@ -1449,8 +1497,8 @@ class IFUCube(object):
 
         elfig.suptitle("$\\chi^2/\\textrm{{dof}} = {:.3f}$, " "$\\bar{{x}} = "
                        "{:.2f}$, $\\bar{{y}} = {:.2f}$"
-                       .format(bin_res["emline_res"]["chi2dof"],
-                               bin_res["x_bar"], bin_res["y_bar"])
+                       .format(bin_res["emission"]["chi2dof"],
+                               bin_res["mean"][0], bin_res["mean"][1])
                        , color="k", size=12)
         elfig.subplots_adjust(wspace=0.1)
         elfig.savefig(self.base_name+"_el_fit_{}.png".format(bin_num),
@@ -1476,18 +1524,20 @@ class IFUCube(object):
         if indicator not in valid_indicators:
             raise AttributeError("`indicator` must be one of {}"
                                  .format(valid_indicators))
+        bin_num = self._get_bin_nums("nobad")
         # Initialise an empty map to populate with Z values
         Zmap = np.empty(self.data_cube.shape[1:]) * np.nan
-        Zvals = np.empty(len(self._get_bin_nums())) * np.nan
+        Zvals = np.empty(len(bin_num)) * np.nan
         # Hold the mean, min and max distance of the bins from the nucleus
-        dists = np.empty((len(self._get_bin_nums()), 3)) * np.nan
+        dists = np.empty((len(bin_num), 3)) * np.nan
 
-        for i,bn in enumerate(self._get_bin_nums()):
-            r = self.results["bin"][bn]
-            Z = r["metallicity"][indicator]
-            Zmap[r["y_spax"],r["x_spax"]] = Z
+        for i,bn in enumerate(bin_num):
+            bin_res = self.results["bin"][bn]
+            Z = bin_res["emission"]["metallicity"][indicator]
+            Zmap[bin_res["spax"][::-1]] = Z
             Zvals[i] = Z
-            dists[i] = (r["dist_bar"], r["dist_min"], r["dist_max"])
+            dists[i] = (bin_res["dist_mean"], bin_res["dist_min"],
+                        bin_res["dist_max"])
         Zvalsnn = Zvals[~np.isnan(Zvals)] # no nans
 
         zfig = plt.figure()
@@ -1505,7 +1555,7 @@ class IFUCube(object):
         axcum = zfig.add_subplot(gs[0,1])
         n,b,p = axcum.hist(Zvalsnn, cumulative=True,
                            normed=True, histtype="step", linewidth=3,
-                           bins=len(self._get_bin_nums()), color=c.cmap(0.5))
+                           bins=len(bin_num), color=c.cmap(0.5))
         p[0].set_xy(p[0].get_xy()[:-1])
         axcum.set_xlim(min(Zvalsnn), np.max(Zvalsnn))
         axcum.set_ylim(0, 1)
@@ -1526,54 +1576,25 @@ class IFUCube(object):
         print("plot saved to {}_metallicity_{}.pdf".format(self.base_name,
                                                            indicator))
 
-    def make_emission_line_cube(self, clobber=False):
+    def plot_worst_fits(self, N=5):
         """
-        Subtract starlight continuum fits from data and save the cube.
+        Find the N bins with the worst chi2 from the starlight and emission
+        line fits and plot both fits for these bins.
 
-        Where binning has been performed, the individual spectra are replaced
-        by the binned spectrum. The emission line cube is saved with suffix
-        `_emissionline.fits`.
-
-
-        Parameters
-        ----------
-        clobber : bool, optional
-            Whether to overwrite an existing emission line cube.
         """
-        outfile = self.base_name+"_emissionline.fits"
-        if not clobber and os.path.isfile(outfile):
-                print("{} exists and clobber is false".format(outfile))
-                return
-
-        # make a dummy cube to hold the emission line spectra
-        emission_line_cube = np.empty(self.data_cube.shape) * np.nan
-        for b in self.results["bin"]:
-            r = self.results["bin"][b]
-            # subtract the synthetic spectrum from the data and account for
-            # normalisation in starlight
-            emission_line_spec = ((r["sl_spec"][:,1] - r["sl_spec"][:,2]) *
-                                  r["fobs_norm"])
-            for x, y in zip(r["x_spax"],r["y_spax"]):
-                emission_line_cube[:,y,x] = emission_line_spec
-
-        hdulist = fits.HDUList()
-        hdulist.append(fits.ImageHDU(data = emission_line_cube,
-                                     header=self.data_cube.header))
-        hdulist.append(fits.ImageHDU(data = self.stddev_cube.data,
-                                     header=self.stddev_cube.header))
-        hdulist.writeto(outfile, clobber=clobber)
-
-        print("emission line cube saved to {}".format(outfile))
-
-    def make_continuum_cube(self):
-        """
-        Subtract the emission line model from each bin to produce a continuum
-        cube.
-
-        To be implemented.
-        """
-        pass
-        #print("continuum cube saved to {}".format(outfile))
+        c = self._get_bin_nums("nocontbad")
+        worst_sl_bins = sorted(c, key=(lambda key:
+                        self.results["bin"][key]["continuum"].get("chi2/Nl_eff",
+                                                               -1)))[-N:]
+        print("worst continuum fitted bins: {}".format(worst_sl_bins))
+        e = self._get_bin_nums("nobad")
+        worst_el_bins = sorted(e, key=(lambda key:
+                        self.results["bin"][key]["emission"]["chi2dof"]))[-N:]
+        print("worst emission line fitted bins: {}".format(worst_el_bins))
+        worst_bins = set(worst_sl_bins + worst_el_bins)
+        for wb in worst_bins:
+            self.plot_continuum(wb)
+            self.plot_emission(wb)
 
     @classmethod
     def load_pkl(self, pkl_file):
@@ -1715,6 +1736,7 @@ class MUSECube(IFUCube):
         cube_hdu[0].header["IFU_Z"] = float(redshift)
 
         super(MUSECube, self).__init__(cube_hdu, base_name, RV, sl_dir, el_json)
+
 
 def _get_emline_model(emlines, res=None):
     """
@@ -1949,22 +1971,22 @@ def fit_starlight(fargs):
         out_file = None
     else:
         out_file = out_file_path
-    return bin_num, out_file, spec_file
+    return bin_num, out_file
 
 
 def fit_emission_lines(fargs):
     bin_num, bin_res, el, vd_init, v0_init, amp_init, stddev_b, off_b, w = fargs
     print("fitting bin number {:>5}".format(bin_num), end="\r")
     sys.stdout.flush()
-    spec = bin_res["sl_spec"]
 
+    spec = bin_res["continuum"]["sl_spec"]
     if w:
         # The starlight output doesn't give the uncertainty on regions masked in
         # the fitting (i.e. emission lines!) so we need to copy these over from
         # our original spectrum and account for the normalisation of starlight
         stddev_cube = bin_res["spec"][:,2]
         stddev_cube[stddev_cube == 0] = np.nan
-        spec[:,3] = bin_res["fobs_norm"]/stddev_cube**2
+        spec[:,3] = bin_res["continuum"]["fobs_norm"]/stddev_cube**2
     else:
         spec[:,3] = np.ones(len(spec[:,0]))
 
@@ -2004,8 +2026,10 @@ def fit_emission_lines(fargs):
 
     # Use the initial guesses for param combinations later
     if v0_init == "vstar":
-        offset_low = 1 + max((bin_res["v0_min"]-200), off_b[0])/ckms
-        offset_high = 1 + min((bin_res["v0_min"]+200), off_b[1])/ckms
+        offset_low = 1 + max((bin_res["continuum"]["v0_min"]-200),
+                             off_b[0])/ckms
+        offset_high = 1 + min((bin_res["continuum"]["v0_min"]+200),
+                              off_b[1])/ckms
         offset_init = np.linspace(offset_low, offset_high, 6)
     else:
         offset_init = 1 + np.array(np.array(v0_init)/ckms)
@@ -2048,13 +2072,11 @@ def fit_emission_lines(fargs):
     # matrix, so here we correct any negative amplitudes since these are suppose
     # to be emission features
     for sm in best_fit.submodel_names:
-        # TODO add here if submodel has 'emission' in the name then min 0 (and
-        # vice versa)
         if best_fit[sm].amplitude.value < 0:
             best_fit[sm].amplitude.value = 0
 
     # Save all parameters for the model and uncertainties.
-    res = _model_to_res_dict(best_fit, el, bin_res["fobs_norm"])
+    res = _model_to_res_dict(best_fit, el, bin_res["continuum"]["fobs_norm"])
 
     return bin_num, res
 
@@ -2138,7 +2160,7 @@ def _model_to_res_dict(model, el, fobs_norm=1):
         # primary balmer/forbidden lines since the fitting
         # does not return uncertainties for tied parameters
         sm_uncerts = np.empty(3)
-        sm_uncerts[0] = fitted_uncerts[j] * fobs_norm # " amp "
+        sm_uncerts[0] = fitted_uncerts[j] # " amp "
         if sm.endswith("B"):
             idx = b_idx
         elif sm.endswith("F"):
@@ -2207,6 +2229,7 @@ def shiftedColorMap(cmap, start=0, midpoint=0.5, stop=1.0, name="shiftedcmap"):
     plt.register_cmap(cmap=newcmap)
 
     return newcmap
+
 
 if __name__ == "__main__":
     pass
