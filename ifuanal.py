@@ -240,7 +240,7 @@ class IFUCube(object):
             s = SkyCoord(xc, yc, unit=(u.hourangle, u.deg))
             xc, yc = s.to_pixel(w)
             if np.any(np.isnan([xc,yc])):
-                raise AttributeError("Couldn't find pixel location for {}"\
+                raise ValueError("Couldn't find pixel location for {}"\
                                      .format(s.to_string(hmsdms)))
 
         if box_size == 0:
@@ -249,7 +249,7 @@ class IFUCube(object):
             return
         elif not box_size <= xc <= self.data_shape[2] - box_size \
              or not box_size <= yc <= self.data_shape[1] - box_size:
-            raise AttributeError("box must be fully within the image, use "
+            raise ValueError("box must be fully within the image, use "
                                  "box_size=0 to force a location outside "
                                  "the FOV.")
             return
