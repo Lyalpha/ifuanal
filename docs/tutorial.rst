@@ -53,7 +53,8 @@ type ``object?`` from within an IPython session to find out about
 Create a new instance
 ---------------------
 
-For this example MUSE science verification data of the target **NGC2906** will be analysed.
+For this example MUSE science verification data of the target **NGC2906** will
+be analysed.
 
 ::
 
@@ -416,7 +417,8 @@ amplitude, mean and standard deviation of the gaussians. To circumvent this a
 somewhat brute force method is overlaid on the fitter minimisation, as
 well as applying some conditions to the fitted parameters:
 
-* The input observed spectrum is masked for wavelengths more than ``offset_bounds``
+* The input observed spectrum is masked for wavelengths more than
+  ``offset_bounds``
   + 3 :math:`\times` ``stddev_bounds`` from an emission line rest wavelength.
   Wavelengths outside these windows are not fit for.
 * A grid of initial guesses with every combination of the initial guess lists
@@ -512,10 +514,10 @@ methods can be made.See the docs for each method for more info.
 
 :meth:`~ifuanal.IFUCube.plot_continuum`
 """""""""""""""""""""""""""""""""""""""
-plots the spectra of a bin and the fit to the continuum, as well as the contribution
-of the various age and metallicity bases to the integrated fit.
+plots the spectra of a bin and the fit to the continuum, as well as the
+contribution of the various age and metallicity bases to the integrated fit.
 
-:meth:`~ifuanal.IFUCube.plot_continuum`
+:meth:`~ifuanal.IFUCube.plot_emission`
 """""""""""""""""""""""""""""""""""""""
 plots the spectra of a bin and the fit to the emission spectrum.
 
@@ -536,8 +538,9 @@ the continuum fits as a map.
 
 :meth:`~ifuanal.IFUCube.plot_metallicity`
 """""""""""""""""""""""""""""""""""""""""
-plots the metallicity for the chosen indicator as a map aslongside the cumulative
-metallicity of the bins and a radial dependancy plot.
+plots the metallicity for the chosen
+indicator as a map aslongside the cumulative metallicity of the bins and a
+radial dependancy plot. Custom bins are highlighted.
 
 .. Warning::
    :meth:`~ifuanal.IFUCube.plot_continuum` will fail if use more than
