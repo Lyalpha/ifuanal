@@ -1,10 +1,14 @@
 #TODOs
 
+#TODO    : rewrite binning methods to workers that return an array of just
+#          {"mean":.., "spax":...} then populate spectra/distances by
+#          master bin method.
+
+#TODO    : make_emission_line_cube/make_continuum_cube to just
+#          make_results_cube also containign bin segmap and BINTable of results
+
 #TODO    : add a binning method that uses image segmentation via photutils
 #          and is similar to SExtractor
-
-#TODO    : on plots (esp. metallicity) highlight the location of custom bins
-#          on histogram/radial plot
 
 #TODO    : bin_inspection - i.e.: make a plot of all indiv specs in bin and the
 #          weighted spec, show location on voronoi plot, print results of
