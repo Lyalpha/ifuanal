@@ -425,7 +425,7 @@ class IFUCube(object):
             x, y, x_mean, y_mean, _bn = vor_output[idx].T
             x, y = x.astype("int"), y.astype("int")
             x_mean, y_mean = x_mean[0], y_mean[0]
-            nx, ny = self.nucleus
+            nx, ny = self.nucleus - 0.5
             distances = ((x - nx)**2 + (y - ny)**2)**0.5
             bin_nums[bn] = {"spax":(x, y),
                             "mean":(x_mean, y_mean),
@@ -576,7 +576,7 @@ class IFUCube(object):
                 # We swap the x and y to FITS standard in the dict
                 xy_spax = np.where(bin_map == bn)[::-1]
                 xy_mean = (x,y)[::-1]
-                nx, ny = self.nucleus
+                nx, ny = self.nucleus - 0.5
                 distances = ((xy_spax[0] - nx)**2
                                  + (xy_spax[1] - ny)**2)**0.5
                 bin_nums[bn] = {"spax": xy_spax,
@@ -650,7 +650,7 @@ class IFUCube(object):
                 break
             bn -= 1
 
-        nx, ny = self.nucleus
+        nx, ny = self.nucleus - 0.5
         distances = ((xy_spax[0] - nx)**2 + (xy_spax[1] - ny)**2)**0.5
         self.results["bin"][bn] = {"spax": xy_spax,
                                    "mean": (x_cen,y_cen),
