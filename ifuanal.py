@@ -821,8 +821,7 @@ class IFUCube(object):
         return spec
 
     def run_starlight(self, bin_num=None, base_name="bc03", lamb_low=5590.,
-                      lamb_upp=5680., use_tmp_dir=None, clobber=False,
-                      append=False):
+                      lamb_upp=5680., clobber=False):
         """
         Run the starlight fitting of spectra in the cube.
 
@@ -845,17 +844,8 @@ class IFUCube(object):
             The wavelength limits over which starlight will calculate the S/N.
             This isn't actually used since we have a stddev cube but the limits
             must be within the wavelengh range of the cube anyway.
-        use_tmp_dir: None or str, optional
-            The temporary directory where the resampled bases and output will
-            be stored. If None a safe temporary directory will be made. A
-            previous temporary directory used can be given and the resampled
-            bases in there will be used (defaults to None).
         clobber : bool, optional
             Whether to overwrite pre-existing results.
-        append : bool, optional
-            NOT IMPLEMENTED YET. (Allow method to overwrite sl_output only for
-            ``bin_num`` and append these to the output rather than overwrite) -
-            NOTE sl_output is set as empty dict on __init__)
         """
         print("running starlight fitting")
 
@@ -869,7 +859,7 @@ class IFUCube(object):
         if not clobber:
             for bn in bin_num:
                 try:
-                    self.results["bin"]["continuum"]["sl_output"]
+                    self.results["bin"][bn]["continuum"]["sl_output"]
                 except KeyError:
                     pass
                 else:
@@ -878,30 +868,26 @@ class IFUCube(object):
                     return
 
         print("fitting {} bins...".format(len(bin_num)))
-        if use_tmp_dir:
-            sl_tmp_dir = os.path.join(use_tmp_dir,"")
-            print("using STARLIGHT tmp directory {}".format(sl_tmp_dir))
-        else:
-            # We need to copy everything to a temporary folder since
-            # starlight has filepath character length issues, plus
-            # then it doesn't clog up cwd.
-            # Make a safe temporary directory to hold everything
-            sl_tmp_dir = os.path.join(tempfile.mkdtemp(prefix="starlight_"),"")
-            print("STARLIGHT tmp directory for this run is {}"
-                  .format(sl_tmp_dir))
-            # Copy over the bases and resample them to that of our data
-            bases_tmp_dir = os.path.join(sl_tmp_dir, base_name)
-            # Because shutil.copytree requires `dst` doesn't exist:
-            shutil.rmtree(sl_tmp_dir)
-            shutil.copytree(self.sl_dir, sl_tmp_dir)
-            d = os.path.join(sl_tmp_dir, base_name)
-            basefiles = [os.path.join(d, f) for f in os.listdir(d)]
-            Nbasefiles = len(basefiles)
-            for i, basefile in enumerate(basefiles,1):
-                print("resampling base files {:>4}/{:4}".format(i,Nbasefiles),
-                      end="\r")
-                resample_base(basefile, self.lamb, self.delta_lamb)
-            print()
+        # We need to copy everything to a temporary folder since
+        # starlight has filepath character length issues, plus
+        # then it doesn't clog up cwd.
+        # Make a safe temporary directory to hold everything
+        sl_tmp_dir = os.path.join(tempfile.mkdtemp(prefix="starlight_"),"")
+        print("STARLIGHT tmp directory for this run is {}"
+              .format(sl_tmp_dir))
+        # Copy over the bases and resample them to that of our data
+        bases_tmp_dir = os.path.join(sl_tmp_dir, base_name)
+        # Because shutil.copytree requires `dst` doesn't exist:
+        shutil.rmtree(sl_tmp_dir)
+        shutil.copytree(self.sl_dir, sl_tmp_dir)
+        d = os.path.join(sl_tmp_dir, base_name)
+        basefiles = [os.path.join(d, f) for f in os.listdir(d)]
+        Nbasefiles = len(basefiles)
+        for i, basefile in enumerate(basefiles,1):
+            print("resampling base files {:>4}/{:4}".format(i,Nbasefiles),
+                  end="\r")
+            resample_base(basefile, self.lamb, self.delta_lamb)
+        print()
         # Compute the spectra and write the spectrum to a temp file
         spec_files = []
         for bn in bin_num:
