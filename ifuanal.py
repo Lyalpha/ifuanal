@@ -1519,19 +1519,19 @@ class IFUCube(object):
             The metallicity indicator to plot, current options are "PP04_N2",
             "PP04_O3N2", "M13", "D16".
         """
-
         valid_indicators = ["PP04_N2", "PP04_O3N2", "M13", "D16"]
         if indicator not in valid_indicators:
             raise AttributeError("`indicator` must be one of {}"
                                  .format(valid_indicators))
-        bin_num = self._get_bin_nums("nobad")
+
+        bin_nums, n_custom = self._get_bin_nums("nobad", custom=True)
         # Initialise an empty map to populate with Z values
         Zmap = np.empty(self.data_cube.shape[1:]) * np.nan
-        Zvals = np.empty(len(bin_num)) * np.nan
+        Zvals = np.empty(len(bin_nums)) * np.nan
         # Hold the mean, min and max distance of the bins from the nucleus
-        dists = np.empty((len(bin_num), 3)) * np.nan
+        dists = np.empty((len(bin_nums), 3)) * np.nan
 
-        for i,bn in enumerate(bin_num):
+        for i,bn in enumerate(bin_nums):
             bin_res = self.results["bin"][bn]
             Z = bin_res["emission"]["metallicity"][indicator]
             Zmap[bin_res["spax"][::-1]] = Z
@@ -1543,6 +1543,7 @@ class IFUCube(object):
         zfig = plt.figure()
         gs = gridspec.GridSpec(2, 2, height_ratios=[1, 1],
                                width_ratios=[2,1])
+
         # A map of the bins and their Z values
         axmap = zfig.add_subplot(gs[:,0])
         m = axmap.imshow(Zmap, origin="lower", interpolation="none")
@@ -1551,22 +1552,33 @@ class IFUCube(object):
         c.ax.tick_params(labelsize=16)
         axmap.autoscale(False)
         axmap.plot(self.nucleus[0], self.nucleus[1], "kx", markersize=10)
+
         # A cumulative histogram of the Z values
         axcum = zfig.add_subplot(gs[0,1])
         n,b,p = axcum.hist(Zvalsnn, cumulative=True,
                            normed=True, histtype="step", linewidth=3,
-                           bins=len(bin_num), color=c.cmap(0.5))
+                           bins=len(bin_nums), color=c.cmap(0.3))
+        #    and show the custom bins highlighted
+        for i in range(n_custom):
+            axcum.axvline(Zvals[i], color=c.cmap(0.9), lw=2)
         p[0].set_xy(p[0].get_xy()[:-1])
         axcum.set_xlim(min(Zvalsnn), np.max(Zvalsnn))
         axcum.set_ylim(0, 1)
         axcum.set_xlabel("$Z$ [$12 + \log_{10}(\\textrm{O/H})$]")
         axcum.set_ylabel("Cumulative Fraction")
+
         # A plot of the Z value vs radial distance from nucleus
         axrad = zfig.add_subplot(gs[1,1])
         axrad.errorbar(dists[:,0], Zvals, xerr=[(dists[:,0]-dists[:,1]),
-                       (dists[:,2]-dists[:,0])], color=c.cmap(0.5), ls="none",
+                       (dists[:,2]-dists[:,0])], color=c.cmap(0.3), ls="none",
                        marker="o", mew=0.3, ms=4, capsize=0,
-                       ecolor=c.cmap(0.5))
+                       ecolor=c.cmap(0.3))
+        #    and show the custom bins highlighted
+        axrad.errorbar(dists[:n_custom,0], Zvals[:n_custom],
+                       xerr=[(dists[:n_custom,0]-dists[:n_custom,1]),
+                       (dists[:n_custom,2]-dists[:n_custom,0])],
+                       color=c.cmap(0.9), ls="none", marker="s", mew=0.3,
+                       ms=4, capsize=0, ecolor=c.cmap(0.9))
         axrad.set_xlabel("Distance from nucleus [pixels]")
         axrad.set_ylabel("$Z$ [$12 + \log_{10}(\\textrm{O/H})$]")
         zfig.tight_layout()
