@@ -58,7 +58,7 @@ For this example MUSE science verification data of the target **NGC2906** will b
 ::
 
   >>> import ifuanal
-  >>> cube = ifuanal.MUSECube("NGC2906.fits", 0.008138)
+  >>> cube = ifuanal.MUSECube("NGC2906.fits", 0.007138)
 
 This will initialise the :class:`~ifuanal.MUSECube` class, which does some
 small manipulation to the MUSE FITS file input before ingestion to
