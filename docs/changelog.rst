@@ -3,6 +3,16 @@ Changelog
 
 vdev
 ----
+ * :attr:`results` dict has been reimplemented with a new structure and now
+   supercedes :attr:`bin_nums`.
+
+   - Each bin's spectrum and nucleus distances are now calculated upon bin
+     creation.
+   - Continuum and emission line fitting are contained in separate entries of
+     each bin's results entry named ``"continuum"`` and ``"emission"``.
+ * :meth:`parse_results` and :meth:`parse_emission` have been renamed to
+   :meth:`_parse_continuum` and :meth:`_parse_emission`. They are automatically
+   called after fitting so do not need to be explicitly called usually.
  * Exposed the filepath of the json emission lines file via the ``el_json``
    argument to :class:`~ifuanal.IFUCube` and :class:`~ifuanal.MUSECube`.
 
@@ -14,7 +24,7 @@ v0.3.0
    - The :class:`astropy.modeling.CompoundModel` is no longer stored due to
      issues with pickling, but is instead created as and when necessary via
      :func:`~ifuanal._get_emline_model`.
-   - The emission line fitting results are all stored in the ``results``
+   - The emission line fitting results are all stored in the :attr:`results`
      dictionary entry designated by line name following
      `data/emission_lines.json`.
    - `data/emission_lines.json` can now be added to with other lines, although
