@@ -601,18 +601,18 @@ class IFUCube(object):
                                       figsize=(16,4),
                                       subplot_kw={"adjustable":"box-forced"})
             with warnings.catch_warnings():
-                warnings.simplefilter("ignore", category=RuntimeWarning)
-                ax[0].imshow(np.sqrt(filt_map), origin="lower",
-                             interpolation="none")
+                warnings.simplefilter("ignore")
+                ax[0].imshow(filt_map, origin="lower",
+                             interpolation="none", norm=colors.PowerNorm(0.5))
                 ax[0].set_title("Filter")
-                ax[1].imshow(np.sqrt(cont_map), origin="lower",
-                             interpolation="none")
+                ax[1].imshow(cont_map, origin="lower",
+                             interpolation="none", norm=colors.PowerNorm(0.5))
                 ax[1].set_title("Continuum")
-                ax[2].imshow(np.sqrt(line_map), origin="lower",
-                             interpolation="none")
+                ax[2].imshow(line_map, origin="lower",
+                             interpolation="none", norm=colors.PowerNorm(0.5))
                 ax[2].set_title("Line")
                 ax[3].imshow(bin_map, origin="lower", interpolation="none",
-                             cmap="viridis_r")
+                             cmap="viridis_r", norm=colors.PowerNorm(0.5))
             ax[3].set_title("Bins")
             binfig.suptitle("Filter centre at {}\\AA".format(line_lamb))
             binfig.savefig(self.base_name+"_bins_el.pdf", bbox_inches="tight")
