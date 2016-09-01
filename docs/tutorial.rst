@@ -66,8 +66,8 @@ small manipulation to the MUSE FITS file input before ingestion to
 :class:`~ifuanal.IFUCube`, namely:
 
 * Open the MUSE FITS file into a :class:`astropy.io.fits.HDUList` of the
-  PRIMARY, DATA and STAT extensions.
-* Add a PRIMARY header card `IFU_EBV` specifying the reddening. The argument
+  `PRIMARY`, `DATA` and `STAT` extensions.
+* Add a `PRIMARY` header card `IFU_EBV` specifying the reddening. The argument
   ``ebv`` can be passed to :class:`~ifuanal.MUSECube` to explicitly set this,
   otherwise its default value of "IRSA" will contact the Infrared Science
   Archive to automatically determine it based on the coordinates of the WCS
@@ -82,6 +82,13 @@ small manipulation to the MUSE FITS file input before ingestion to
 ``IFUCube`` is then initialised which will set up the wavelength scale, check
 the STARLIGHT directory (:attr:`sl_dir`) exists, and load the emission line data
 from `data/emission_lines.json`.
+
+.. NOTE::
+
+   The input FITS file must contain the header cards ``CUNIT3`` and ``BUNIT``
+   in the `DATA` extension, which are parsable by :mod:`astropy.units`\' `string
+   parser
+   <http://docs.astropy.org/en/stable/units/format.html#creating-units-from-strings>`_.
 
 .. _deredden-deredshift:
 
