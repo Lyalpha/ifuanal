@@ -1099,6 +1099,7 @@ class IFUCube(object):
                 emlines[line]["fwhm"] = to_fwhm(stddev)
                 emlines[line]["fwhm_uncert"] = to_fwhm(stddev_sig)
                 emlines[line]["offset"] = mean - emlines[line]["rest_lambda"]
+                emlines[line]["offset_uncert"] = mean_sig
 
             # Determine metallcities where possible using SNR>3 lines only
             if (emlines["Halpha_6563"]["snr"] > 3 and
