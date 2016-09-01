@@ -1088,18 +1088,17 @@ class IFUCube(object):
                 # value of the continuum there for EW calculation
                 lamb_idx = np.abs(self.lamb - mean).argmin()
                 cont = bin_res_c["sl_spec"][lamb_idx, 2] * bin_res_c["fobs_norm"]
-                # TODO turn these into quantities based on prim_head
-                # (i.e. in Ang, km/s etc).
                 emlines[line]["flux"] = flux
                 emlines[line]["flux_uncert"] = flux_uncert
                 emlines[line]["snr"] = flux/flux_uncert
                 emlines[line]["ew"] = flux/cont
                 emlines[line]["ew_uncert"] = flux_uncert/cont
                 to_fwhm = lambda x: x * 2 * (2*math.log(2))**0.5
-                emlines[line]["fwhm"] = to_fwhm(stddev)
-                emlines[line]["fwhm_uncert"] = to_fwhm(stddev_sig)
-                emlines[line]["offset"] = mean - emlines[line]["rest_lambda"]
-                emlines[line]["offset_uncert"] = mean_sig
+                rest = emlines[line]["rest_lambda"]
+                emlines[line]["fwhm"] = to_fwhm(stddev) * ckms / rest
+                emlines[line]["fwhm_uncert"] = to_fwhm(stddev_sig) * ckms / rest
+                emlines[line]["offset"] = (mean - rest) * ckms / rest
+                emlines[line]["offset_uncert"] = mean_sig * ckms / rest
 
             # Determine metallcities where possible using SNR>3 lines only
             if (emlines["Halpha_6563"]["snr"] > 3 and
