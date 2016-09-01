@@ -249,7 +249,7 @@ class IFUCube(object):
                                      .format(s.to_string(hmsdms)))
 
         if box_size == 0:
-            self.nucleus = (xc, yc)
+            self.nucleus = np.array((xc, yc))
             print("set nucleus as {}".format(self.nucleus))
             return
         elif not box_size <= xc <= self.data_shape[2] - box_size \
@@ -278,8 +278,8 @@ class IFUCube(object):
         fit_g = fitting.LevMarLSQFitter()
         g = fit_g(g_init, x, y, z)
 
-        self.nucleus = (round(xc-box_size+g.x_mean,3),
-                        round(yc-box_size+g.y_mean,3))
+        self.nucleus = np.array((round(xc-box_size+g.x_mean,3),
+                                round(yc-box_size+g.y_mean,3)))
         print("found nucleus as {}".format(self.nucleus))
 
         self.results["nucleus"] = self.nucleus
