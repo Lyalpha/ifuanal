@@ -15,6 +15,14 @@ vdev
    called after fitting so do not need to be explicitly called usually.
  * Exposed the filepath of the json emission lines file via the ``el_json``
    argument to :class:`~ifuanal.IFUCube` and :class:`~ifuanal.MUSECube`.
+ * Custom bins are now highlighted on the radial and cumulative metallicity
+   plots.
+ * Emission line results for ``fwhm`` and ``offset`` (and their uncertainties)
+   are now given in km/s.
+ * The header card ``BUNIT`` is now queried in the `DATA` extension to get the
+   flux units in order to label plots.
+ * Removed ``use_tmp_dir`` and ``append`` arguments from :meth:`run_starlight`.
+ * Fixed bug in calculation of bin distances from nucleus.
 
 v0.3.0
 ------
