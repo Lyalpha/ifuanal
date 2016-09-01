@@ -1569,16 +1569,119 @@ class IFUCube(object):
         axrad.errorbar(dists[:n_custom,0], Zvals[:n_custom],
                        xerr=[(dists[:n_custom,0]-dists[:n_custom,1]),
                        (dists[:n_custom,2]-dists[:n_custom,0])],
-                       color=c.cmap(0.9), ls="none", marker="s", mew=0.3,
-                       ms=4, capsize=0, ecolor=c.cmap(0.9))
+                       color=c.cmap(0.9), ls="none", marker="*", mew=0.3,
+                       ms=9, capsize=0, ecolor=c.cmap(0.9))
         axrad.set_xlabel("Distance from nucleus [pixels]")
         axrad.set_ylabel("$Z$ [$12 + \log_{10}(\\textrm{O/H})$]")
-        zfig.tight_layout()
+        zfig.suptitle("Metallicity indicator {}"
+                      .format(indicator.replace("_", " ")))
+        gs.tight_layout(zfig, rect=[0, 0.03, 1, 0.97])
         zfig.savefig(self.base_name+"_metallicity_{}.pdf".format(indicator),
                      bbox_inches="tight")
-
         print("plot saved to {}_metallicity_{}.pdf".format(self.base_name,
                                                            indicator))
+
+    def plot_line_map(self, line):
+        """
+        Plot maps of emission line parameters.
+
+        Plots 2D maps and radial distributions of the EW, flux, velocity offset
+        and FWHM of the chosen line.
+
+        Parameters
+        ----------
+        line: str
+            The emission line to plot. This will take the form of,
+            e.g. "Halpha_6563", "[NII]_6583". i.e the line name and the rounded
+            wavelength of the line as per the data in the emission lines json
+            data given to :class:`~ifuanal.IFUCube`. Set as "?" to see a list
+            available.
+        """
+        for bn in self._get_bin_nums("nobad"):
+            try:
+                lines = self.results["bin"][bn]["emission"]["lines"].keys()
+            except KeyError:
+                pass
+            else:
+                if line not in lines or line == "?":
+                    print("available emission lines:")
+                    print(", ".join(lines))
+                    return
+                else:
+                    break
+
+        bin_nums, n_custom = self._get_bin_nums("nobad", custom=True)
+        # Initialise an empty 4-layer map to populate
+        val_maps_shape = (4, self.data_cube.shape[1], self.data_cube.shape[2])
+        val_maps = np.empty(val_maps_shape) * np.nan
+        # Also hold the data and uncerts in a list for the radial plots
+        val_list =  np.empty((len(bin_nums), 4)) * np.nan
+        val_uncert_list = np.empty((len(bin_nums), 4)) * np.nan
+        # Hold the mean, min and max distance of the bins from the nucleus
+        dists = np.empty((len(bin_nums), 3)) * np.nan
+
+        for i,bn in enumerate(bin_nums):
+            bin_res = self.results["bin"][bn]
+            # Only consider those bins with SNR > 3
+            if bin_res["emission"]["lines"][line]["snr"] < 3:
+                continue
+            for j,prop in enumerate(("ew", "flux", "offset", "fwhm")):
+                val = bin_res["emission"]["lines"][line][prop]
+                val_uncert = bin_res["emission"]["lines"][line][prop+"_uncert"]
+                val_maps[j][bin_res["spax"][::-1]] = val
+                val_list[i,j] = val
+                val_uncert_list[i,j] = val_uncert
+                dists[i] = (bin_res["dist_mean"], bin_res["dist_min"],
+                        bin_res["dist_max"])
+
+        lfig = plt.figure(figsize=(16,8))
+        gs = gridspec.GridSpec(2, 4, height_ratios=[2, 1])
+        propdict = {0:{"prop":"ew",
+                       "name": "Equivalent Width",
+                       "unit": self.lamb_unit.to_string("latex")},
+                    1:{"prop":"flux",
+                       "name": "Flux",
+                       "unit": self.flux_unit},
+                    2:{"prop":"offset",
+                       "name": "Velocity offset",
+                       "unit": "km s$^{{-1}}$"},
+                    3:{"prop":"fwhm",
+                       "name": "FWHM",
+                       "unit": "km s$^{{-1}}$"}
+                    }
+        for i, v in propdict.items():
+            # Map of bins and their values for each prop
+            axmap = lfig.add_subplot(gs[0,i])
+            m = axmap.imshow(val_maps[i], origin="lower", interpolation="none")
+            c = plt.colorbar(mappable=m, ax=axmap, orientation="horizontal",
+                             label="{} [{}]".format(v["name"], v["unit"]))
+            c.ax.tick_params(labelsize=12)
+            axmap.autoscale(False)
+            axmap.plot(self.nucleus[0], self.nucleus[1], "kx", markersize=10)
+            axmap.plot(self.nucleus[0], self.nucleus[1], "kx", markersize=10)
+
+            # A radial plot below the map
+            axrad = lfig.add_subplot(gs[1,i])
+            axrad.errorbar(dists[:,0], val_list[:,i],
+                           xerr=[(dists[:,0]-dists[:,1]),
+                                 (dists[:,2]-dists[:,0])],
+                           yerr=val_uncert_list[:,i], color=c.cmap(0.3),
+                           ls="none", marker="o", mew=0.3, ms=4, capsize=0,
+                           ecolor=c.cmap(0.3))
+            # and show the custom bins highlighted
+            axrad.errorbar(dists[:n_custom,0], val_list[:n_custom,i],
+                           xerr=[(dists[:n_custom,0]-dists[:n_custom,1]),
+                                 (dists[:n_custom,2]-dists[:n_custom,0])],
+                           yerr=val_uncert_list[:n_custom,i],
+                           color=c.cmap(0.9), ls="none", marker="*", mew=0.3,
+                           ms=9, capsize=0, ecolor=c.cmap(0.9))
+            axrad.set_xlabel("Distance from nucleus [pixels]")
+            axrad.set_ylabel("{} [{}]".format(v["name"], v["unit"]))
+        lfig.suptitle("Emission line {}".format(line.replace("_", " ")))
+        gs.tight_layout(lfig, rect=[0, 0.03, 1, 0.97])
+        lfig.savefig(self.base_name+"_{}.pdf".format(line),
+                     bbox_inches="tight")
+        print("plot saved to {}_{}.pdf".format(self.base_name, line))
 
     def plot_worst_fits(self, N=5):
         """
