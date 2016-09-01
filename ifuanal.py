@@ -104,7 +104,12 @@ class IFUCube(object):
         dl = self.data_cube.header["CD3_3"] # delta lambda
         self.lamb = sl + (np.arange(self.data_shape[0]) - (rl - 1)) * dl
         self.delta_lamb = dl
-        self.lamb_units = u.Unit(self.data_cube.header["CUNIT3"])
+        self.lamb_unit = u.Unit(self.data_cube.header["CUNIT3"])
+        bunit = self.data_cube.header["BUNIT"]
+        try:
+            self.flux_unit = u.Unit(bunit).to_string("latex")
+        except ValueError:
+            self.flux_unit = bunit
 
         if sl_dir is None:
             self.sl_dir = os.path.join(FILEDIR, "starlight")
@@ -141,7 +146,7 @@ class IFUCube(object):
             return
         print("dereddening with E(B-V) = {:.3f}mag and RV = {}"
               .format(ebv, self.RV))
-        Alamb = get_Alamb(self.lamb, ebv, self.RV, self.lamb_units)
+        Alamb = get_Alamb(self.lamb, ebv, self.RV, self.lamb_unit)
         corr = 10**(0.4 * Alamb)
 
         # Multiply our flux and stddevs by the correction
@@ -1239,7 +1244,7 @@ class IFUCube(object):
                          alpha=0.3)
         axresid.set_xlim(np.min(lamb),np.max(lamb))
         axresid.set_xlabel("Wavelength [{}]"
-                           .format(self.lamb_units.to_string()))
+                           .format(self.lamb_unit.to_string("latex")))
         axresid.set_ylabel("Residual")
         axresid.set_yticks([-0.2,0.0,0.2,0.4,0.6])
         axresid.set_ylim(-0.3,0.7)
@@ -1478,8 +1483,9 @@ class IFUCube(object):
         bigax.set_axis_bgcolor("none")
         bigax.tick_params(labelcolor="none", top="off", bottom="off",
                           left="off", right="off")
-        bigax.set_ylabel("F$_\\lambda$")
-        bigax.set_xlabel("Wavelength [{}]".format(self.lamb_units.to_string()))
+        bigax.set_ylabel("Flux [{}]".format(self.flux_unit))
+        bigax.set_xlabel("Wavelength [{}]"
+                         .format(self.lamb_unit.to_string("latex")))
 
         elfig.suptitle("$\\chi^2/\\textrm{{dof}} = {:.3f}$, " "$\\bar{{x}} = "
                        "{:.2f}$, $\\bar{{y}} = {:.2f}$"
