@@ -571,7 +571,7 @@ class IFUCube(object):
                          & (np.isnan(allocs))
             # We only want adjoining pixels to be considered so remove
             # separate (not-touching) objects
-            struct = ndimage.generate_binary_structure(2, 2)
+            struct = ndimage.generate_binary_structure(2, 1)
             objs, nobj = ndimage.label(bin_cutout, structure=struct)
             bin_cutout[np.where(objs != objs[r,r])] = 0
             if np.sum(bin_cutout) >= min_npix:
