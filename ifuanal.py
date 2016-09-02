@@ -164,6 +164,7 @@ class IFUCube(object):
         z = self.prim_cube.header["IFU_Z"]
         if z == 0:
             print("redshift = 0, skipping deredshift()")
+            return
         print("deredshifting from z = {}".format(z))
         # Update the lambda array
         self.lamb /= 1. + z
