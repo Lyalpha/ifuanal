@@ -2052,7 +2052,7 @@ def fit_starlight(fargs):
         # precision losses means our last observed wavelength is not included
         delta_lamb_syn = round(delta_lamb,8)
         lamb_syn_ini = round(lamb[0],8)
-        lamb_syn_fin = lamb_syn_ini + (len(lamb) - 1) * delta_lamb_syn
+        lamb_syn_fin = round(lamb[-1],8)+0.01
         # the header
         grid_file.write("\n".join(["1", os.path.join(tmp_dir,bases,""),
                                    tmp_dir, tmp_dir, tmp_dir, str(RANDSEED),
