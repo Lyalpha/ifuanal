@@ -1494,6 +1494,7 @@ class IFUCube(object):
                                bin_res["mean"][0], bin_res["mean"][1])
                        , color="k", size=12)
         elfig.subplots_adjust(wspace=0.1)
+        elfig.tight_layout()
         elfig.savefig(self.base_name+"_el_fit_{}.png".format(bin_num),
                       bbox_inches="tight", dpi=300)
         print("plot saved to {}_el_fit_{}.png".format(self.base_name, bin_num))
