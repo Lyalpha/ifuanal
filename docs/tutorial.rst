@@ -26,9 +26,10 @@ type ``object?`` from within an IPython session to find out about
 * Emission lines to fit are defined in the file `data/emissionlines.json`.
   Additional lines can be fit for by copying this file and manually adding new
   entries, and giving the filepath of this new file via the ``el_json``
-  argument. Existing lines should not be altered. No sanity checking of the
-  lines is done, so make sure they are sensible for the data being analysed
-  (i.e. within the wavelength window of the cube).
+  argument. **The entries for `Halpha` and `[NII]` are required and should not be
+  removed or altered**. No sanity checking of the lines is done, so make sure
+  they are sensible for the data being analysed (i.e. within the wavelength
+  window of the cube).
 
 .. NOTE::
 
@@ -439,9 +440,10 @@ well as applying some conditions to the fitted parameters:
 * The offset of the lines is limited to between -500 and +500 km/s (from the
   overall :ref:`deredshifted cube <deredden-deredshift>`) by
   default, this can be altered with the argument ``offset_bounds``.
-* The mean and standard deviation of the balmer lines are tied to be the
-  same. The forbidden lines are also tied to each other but they can differ
-  from the balmer values.
+* The offset of the balmer lines are tied to be the same. The forbidden lines
+  are also tied to each other but they can differ from the balmer values.
+* The standard deviation width of the fits can differ between lines, but any
+  doublets (or triplets) are forced to be fit with the same width.
 * If any negative amplitude is found, it is set to zero (since we are dealing
   only with emission lines currently).
 
@@ -450,6 +452,18 @@ and the :math:`\chi^2`/dof value of the fit stored; the minimum
 :math:`\chi^2`/dof is taken as the best fit.
 
 Parameters and their uncertainties are stored within the :ref:`results-dict`.
+When a fitting is deemed to fail (``no covariance matrix computed for bin i
+...``) this is either due to an inherently low SNR emission line spectrum or
+the fitting encounted one of the bounding conditions of the fit
+(``stddev_bounds`` or ``offset_bounds``). In the latter case the covariance of
+the fitted parameters cannot be computed and an inspection of the fit via: ::
+
+    >>> cube.plot_emission(i)
+    plot saved to NGC2906_el_fit_i.png
+
+will show the issue. For example, if the lines are well offset in velocity from
+the galaxy, relaxing ``offset_bounds`` and providing ``v0_init`` with more
+appropriate initial guesses should help the fit.
 
 .. _saving-loading:
 
@@ -501,7 +515,7 @@ can do all this fancy stuff...
 .. _results-dict:
 
 the :attr:`results` dictionary
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 As an example, to see the results for a bin of number
 ``bn``, type: ::
 
