@@ -1856,12 +1856,8 @@ def _get_emline_model(emlines, res=None):
     """
     model = None
     for elem, wl in emlines.items():
-        if elem[0]+elem[-1] == "[]":
-            t = "F"
-        else:
-            t = "B"
         for n, _wl in enumerate(map(float, wl)):
-            submodel_name = "{}_{:.0f}_{}_{}".format(elem, _wl, n, t)
+            submodel_name = "{}_{:.0f}_{}".format(elem, _wl, n)
             if res is not None:
                 line = "{}_{:.0f}".format(elem, _wl)
                 params = res["lines"][line]["fit_params"]
@@ -2103,25 +2099,33 @@ def fit_emission_lines(fargs):
     el_init = _get_emline_model(el).rename(bin_num)
     # Add bounds and ties to the parameters prior to fitting
     for sm in el_init.submodel_names:
-        e, wl, n, t = sm.split("_")
+        e, wl, n = sm.split("_")
         n = int(n)
-        if sm in ("Halpha_6563_0_B", "[NII]_6583_1_F"):
-            el_init[sm].mean.bound = [el[e][n] * (1+off_b[0]/ckms),
-                                      el[e][n] * (1+off_b[1]/ckms)]
+
+        if n == 0:
+            # Bound this elem to our offset and stddev limits
+            el_init[sm].mean.bounds = [el[e][n] * (1+off_b[0]/ckms),
+                                       el[e][n] * (1+off_b[1]/ckms)]
             el_init[sm].stddev.bounds =  [el[e][n] * stddev_b[0]/ckms,
                                           el[e][n] * stddev_b[1]/ckms]
+        else:
+            # If we have a doublet/triplet etc. then tie these to the
+            # stddev of the 0th line
+            wl0 = el[e][0]
+            sm0 = "{}_{:.0f}_0".format(e, wl0)
+            el_init[sm].stddev.tied = lambda x, sm=sm, sm0=sm0: (x[sm].mean
+                                                            * (x[sm0].stddev
+                                                               / x[sm0].mean))
+        if sm in ("Halpha_6563_0", "[NII]_6548_0"):
             continue
-        if sm[-1] == "B":
-            # Tie to Halpha 6563
-            s = ("Halpha_6563_0_B", "Halpha", 0)
-        if sm[-1] == "F":
-            # Tie to [NII] 6583
-            s = ("[NII]_6583_1_F", "[NII]", 1)
-        el_init[sm].mean.tied = lambda x, e=e,n=n,s=s: (el[e][n]
-                                                * x[s[0]].mean/el[s[1]][s[2]])
-        el_init[sm].stddev.tied = lambda x, s=s, sm=sm: ((x[s[0]].stddev
-                                                          / x[s[0]].mean)
-                                                         * x[sm].mean)
+        # Tie the means of other lines to the anchor forbidden/balmer
+        # line as appropriate
+        if e.startswith("[") and e.endswith("]"):
+            el_init[sm].mean.tied = lambda x, e=e,n=n: (el[e][n]
+                                    * x["[NII]_6548_0"].mean/el["[NII]"][0])
+        else:
+            el_init[sm].mean.tied = lambda x, e=e,n=n: (el[e][n]
+                                    * x["Halpha_6563_0"].mean/el["Halpha"][0])
 
     # Mask regions away from emission lines outside windows of
     # offset_limit + 3*stddev_limit around line rest wavelengths
@@ -2156,7 +2160,7 @@ def fit_emission_lines(fargs):
         # Make an initialisation of the model using this combo
         amp, off, sd = comb
         for sm in el_init.submodel_names:
-            elem, wl, n, t = sm.split("_")
+            elem, wl, n = sm.split("_")
             wavelengh = el[elem][int(n)]
             el_init[sm].parameters = [amp, wavelengh*off, wavelengh*sd]
         # Create the fitter and perform the fit for this combination
@@ -2233,10 +2237,7 @@ def _model_to_res_dict(model, el, fobs_norm=1):
     parameters and uncertainties.
     """
     res = {}
-
     res["chi2dof"] = model.chi2dof
-
-    j = 0
     try:
         fitted_uncerts = np.diag(model.fit_info["param_cov"])**0.5
     except ValueError:
@@ -2248,16 +2249,19 @@ def _model_to_res_dict(model, el, fobs_norm=1):
     else:
         res["bad"] = 0
 
-    b_idx = model.submodel_names.index("Halpha_6563_0_B")
-    f_idx = model.submodel_names.index("[NII]_6583_1_F")
-    if b_idx < f_idx:
-        f_idx += 2
-    elif f_idx < b_idx:
-        b_idx += 2
+
+    # Find the location of our balmer and forbidden offset anchor
+    # lines in the uncert array
+    param_idx = np.array(fitting._model_to_fit_params(model)[1])
+    sm_balmer_idx = model.submodel_names.index("Halpha_6563_0")
+    sm_forbidden_idx = model.submodel_names.index("[NII]_6548_0")
+    uncertb_idx = np.argwhere(param_idx == sm_balmer_idx*3)
+    uncertf_idx = np.argwhere(param_idx == sm_forbidden_idx*3)
 
     res["lines"] = {}
+    j = 0
     for i,sm in enumerate(model.submodel_names):
-        e, wl, n, t = sm.split("_")
+        e, wl, n = sm.split("_")
         n = int(n)
         name = "{}_{}".format(e, wl) # `elem_wl`
         res["lines"][name] = {}
@@ -2269,20 +2273,34 @@ def _model_to_res_dict(model, el, fobs_norm=1):
         # primary balmer/forbidden lines since the fitting
         # does not return uncertainties for tied parameters
         sm_uncerts = np.empty(3)
-        sm_uncerts[0] = fitted_uncerts[j] # " amp "
-        if sm.endswith("B"):
-            idx = b_idx
-        elif sm.endswith("F"):
-            idx = f_idx
-        sm_uncerts[1] = fitted_uncerts[idx+1] # mean
-        sm_uncerts[2] = fitted_uncerts[idx+2] # stddev
-        if name in ("Halpha_6563_0_B", "[NII]_6583_1_F"):
-            j += 3
-        else:
+        sm_uncerts[0] = fitted_uncerts[j] # amplitude
+        if sm in ("Halpha_6563_0", "[NII]_6548_0"):
             j += 1
-        sm_res["fit_uncerts"] = sm_uncerts
+            sm_uncerts[1] = fitted_uncerts[j] # mean
+            j += 1
+            sm_uncerts[2] = fitted_uncerts[j] # stddev
+        else:
+            if e.startswith("[") and e.endswith("]"):
+                sm_uncerts[1] = fitted_uncerts[uncertf_idx+1] # mean
+            else:
+                sm_uncerts[1] = fitted_uncerts[uncertb_idx+1] # mean
+            if n == 0:
+                j += 1
+                sm_uncerts[2] = fitted_uncerts[j] # stddev
+            else:
+                if sm == "[NII]_6583_1":
+                    sm_uncerts[2] = fitted_uncerts[uncertf_idx+2] # stddev
+                else:
+                    wl0 = el[e][0]
+                    sm0 = "{}_{:.0f}_0".format(e, wl0)
+                    sm0_idx = model.submodel_names.index(sm0)
+                    uncert0_idx = np.argwhere(param_idx == sm0_idx*3)
+                    sm_uncerts[2] = fitted_uncerts[uncert0_idx+1] # stddev
+
         # Store the rest wavelength to calculate offsets later
         sm_res["rest_lambda"] = el[e][n]
+        sm_res["fit_uncerts"] = sm_uncerts
+        j += 1
 
     return res
 
