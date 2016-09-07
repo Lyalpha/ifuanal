@@ -11,10 +11,16 @@ vdev
    - Continuum and emission line fitting are contained in separate entries of
      each bin's results entry named ``"continuum"`` and ``"emission"``.
  * :meth:`parse_results` and :meth:`parse_emission` have been renamed to
-   :meth:`_parse_continuum` and :meth:`_parse_emission`. They are automatically
-   called after fitting so do not need to be explicitly called usually.
+   :meth:`~ifuanal.IFUCube._parse_continuum` and
+   :meth:`~ifuanal.IFUCube._parse_emission`. They are automatically called
+   after fitting so do not need to be explicitly called usually.
+ * Added :meth:`~ifuanal.IFUCube.plot_line_map`.
  * Exposed the filepath of the json emission lines file via the ``el_json``
    argument to :class:`~ifuanal.IFUCube` and :class:`~ifuanal.MUSECube`.
+ * Emission line fitting now fits the the line widths of each entry in
+   `data/emission_lines.json` separately (doublet/triplet lines will be
+   tied to the same widths). Previously only two widths were fit, one for
+   forbidden lines and one for Balmer.
  * Custom bins are now highlighted on the radial and cumulative metallicity
    plots.
  * Emission line results for ``fwhm`` and ``offset`` (and their uncertainties)
