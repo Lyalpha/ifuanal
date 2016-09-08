@@ -350,7 +350,7 @@ class IFUCube(object):
         ----------
         Uses the algorithm of [CC03]_.
 
-        .. [CC03] Cappellari, M & Copin, Y, "Adaptive spatial binning of
+        .. [CC03] Cappellari, M. & Copin, Y., "Adaptive spatial binning of
            integral-field spectroscopic data using Voronoi tessellations",
            MNRAS, 2003.
 
@@ -1819,7 +1819,7 @@ class MUSECube(IFUCube):
 
     References
     ----------
-    .. [SF11] Schlafly, E & Finkbeiner, D, "Measuring Reddening with Sloan\
+    .. [SF11] Schlafly, E. & Finkbeiner, D., "Measuring Reddening with Sloan\
        Digital Sky Survey Stellar Spectra and Recalibrating SFD", ApJ, 2011
 
     """
