@@ -125,6 +125,7 @@ class IFUCube(object):
         else:
             self._emission_lines = json.load(el_json)
 
+        self._z = self.prim_cube.header["IFU_Z"]
         self.nucleus = None
         self.n_cpu = int(min(mp.cpu_count()-1,mp.cpu_count()*0.9))
 
@@ -1534,10 +1535,10 @@ class IFUCube(object):
                         bin_res["dist_max"])
         Zvalsnn = Zvals[~np.isnan(Zvals)] # no nans
 
+        plt.close("all")
         zfig = plt.figure()
         gs = gridspec.GridSpec(2, 2, height_ratios=[1, 1],
                                width_ratios=[2,1])
-
         # A map of the bins and their Z values
         axmap = zfig.add_subplot(gs[:,0])
         m = axmap.imshow(Zmap, origin="lower", interpolation="none")
@@ -1582,6 +1583,104 @@ class IFUCube(object):
                      bbox_inches="tight")
         print("plot saved to {}_metallicity_{}.pdf".format(self.base_name,
                                                            indicator))
+
+    def plot_bpt(self):
+        """
+        Plot the BPT diagram for all bins
+
+        The [NII]/Halpha vs [OIII]/Hbeta [BPT]_ diagram is plotted for each
+        bin, along with a 2D map showing the classification of each
+        bin. Classification dividing relations are taken from [K13]_ for the
+        AGN-HII division, and [K01]_ for a maximal starburst.
+
+        References
+        ----------
+        .. [BPT] Baldwin, J. A., Phillips, M. M. & Terlevich, R.,
+                 "Classification parameters for the emission-line spectra of
+                 extragalactic objects", 1981, PASP, 93, 53
+        .. [K01] Kewley, L. J. et al. "Theoretical Modeling of Starburst
+                 Galaxies", ApJ, 556, 121
+        .. [K13] Kewley, L. J. et al. "The Cosmic BPT Diagram: Confronting
+                 Theory with Observations", 2013, ApJL, 774, 10
+        """
+        # Redshift dependant dividing relation between Hii regions and AGN
+        # from Kewley et al. 2013 eq. 1
+        # x = [NII]/Halpha flux ratio
+        OIIIHb_k13 = lambda x, z=self._z: (0.61/(np.log10(x)-0.02-0.1833*z)
+                                            + 1.2 + 0.03 * z)
+        # and from Kewley et al. 2001 eq. 5 the maximal starburst limit
+        OIIIHb_k01 = lambda x: (0.61/(np.log10(x)-0.47) + 1.19)
+
+        bin_nums, n_custom = self._get_bin_nums("nobad", custom=True)
+        # Initialise an empty map to populate with values denoting:
+        # 0 = Hii, 1 = Hii-> maximal starburst, 2 = AGN
+        valmap = np.empty(self.data_cube.shape[1:]) * np.nan
+        # Hold the line ratios for each bin:
+        # ([NII]/Ha, uncert, [OIII]/Hb, uncert, val) per row
+        lineratios = np.empty((len(bin_nums), 5)) * np.nan
+
+        for i,bn in enumerate(bin_nums):
+            bin_res = self.results["bin"][bn]
+            f = [bin_res["emission"]["lines"][line]["flux"] for line in
+                 ("[NII]_6583", "Halpha_6563", "[OIII]_5007", "Hbeta_4861")]
+            fu = [bin_res["emission"]["lines"][line]["flux_uncert"] for
+                  line in ("[NII]_6583", "Halpha_6563",
+                           "[OIII]_5007", "Hbeta_4861")]
+            NIIHa = f[0]/f[1]
+            NIIHa_uncert = NIIHa * ((fu[0]/f[0])**2 + (fu[1]/f[1])**2)**0.5
+            OIIIHb = f[2]/f[3]
+            OIIIHb_uncert = OIIIHb * ((fu[2]/f[2])**2 + (fu[3]/f[3])**2)**0.5
+            val = 0 # The value to show as on map
+            if math.log10(OIIIHb) > OIIIHb_k13(NIIHa):
+                val+=1 # above HII/AGN divider
+            if math.log10(OIIIHb) > OIIIHb_k01(NIIHa):
+                val+=1 # above maximal starburst
+            valmap[bin_res["spax"][::-1]] = val
+            lineratios[i] = [math.log10(NIIHa), 0.434*(NIIHa_uncert/NIIHa),
+                             math.log10(OIIIHb), 0.434*(OIIIHb_uncert/OIIIHb),
+                             val]
+
+        plt.close("all")
+        vfig = plt.figure()
+        gs = gridspec.GridSpec(1, 2)
+        # A map of the bins and their values
+        axmap = vfig.add_subplot(gs[0,0])
+        c = cm.viridis
+        cmap = colors.ListedColormap([c(0.1), c(0.5), c(0.9)])
+        norm = colors.BoundaryNorm([0,1,2,3], cmap.N)
+        m = axmap.imshow(valmap, origin="lower", interpolation="none",
+                         cmap=cmap, norm=norm)
+        cbar = plt.colorbar(mappable=m, ax=axmap, orientation="horizontal")
+        cbar.ax.get_xaxis().set_ticks([])
+        for j, lab in enumerate(["HII","SB", "AGN"]):
+            cbar.ax.text((2*j + 1) / 6., -1.5, lab, ha="center")
+        cbar.ax.tick_params(labelsize=16)
+        axmap.autoscale(False)
+        axmap.plot(self.nucleus[0], self.nucleus[1], "kx", markersize=10)
+        # The BPT scatter plot
+        # get the rows for each type so we can colour differently on plot
+        hii = np.argwhere(lineratios[:,4] == 0)
+        sb = np.argwhere(lineratios[:,4] == 1)
+        agn = np.argwhere(lineratios[:,4] == 2)
+        axrat = vfig.add_subplot(gs[0,1])
+        x0 = np.linspace(-2, 0.02+0.1832*self._z, 100)
+        x1 = np.linspace(-2, 0.46, 100)
+        axrat.plot(x0, OIIIHb_k13(10**x0), "k-")
+        axrat.plot(x1, OIIIHb_k01(10**x1), "k--", label="Maximal starburst")
+        for r, cval in zip((hii, sb, agn), (0.1, 0.5, 0.9)):
+            axrat.errorbar(lineratios[r,0], lineratios[r,2],
+                           xerr=lineratios[r,1], yerr=lineratios[r,3],
+                           color=c(cval), ls="none", marker="o", mew=0.3,
+                           ms=6, capsize=0, ecolor=c(cval))
+        axrat.legend(loc=0, frameon=False)
+        axrat.set_xlabel("$\\log_{10}([\\textrm{NII}]/\\textrm{H}\\alpha)$")
+        axrat.set_ylabel("$\\log_{10}([\\textrm{OIII}]/\\textrm{H}\\beta)$")
+        axrat.set_ylim(min(-1, np.min(lineratios[:,1])),1.5)
+        axrat.text(-1.6, -0.2, "\\bf{HII}", size=20, color="darkgrey")
+        axrat.text(-0.15, 0.85, "\\bf{AGN}", size=20, color="darkgrey")
+        vfig.tight_layout()
+        vfig.savefig(self.base_name+"_bpt.pdf", bbox_inches="tight")
+        print("plot saved to {}_bpt.pdf".format(self.base_name))
 
     def plot_line_map(self, line):
         """
