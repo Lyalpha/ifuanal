@@ -541,7 +541,7 @@ class IFUCube(object):
         # Number of peaks
         n_peaks = len(peak_xy)
         # Keep track of which pixels are allocated to which bin
-        bin_map = np.empty(peaks.shape) * np.nan
+        bin_map = np.full(peaks.shape, np.nan)
         bin_nums = {}
         bn = 0 # ensure we have contiguous sequence of bin_numbers
         # Starting with the brightest, run the HII explorer algorithm to the
@@ -1154,7 +1154,7 @@ class IFUCube(object):
                 return
 
         # make a dummy cube to hold the emission line spectra
-        emission_line_cube = np.empty(self.data_cube.shape) * np.nan
+        emission_line_cube = np.full(self.data_cube.shape, np.nan)
         for bn in self._get_bin_nums("nocontbad"):
             bin_res = self.results["bin"][bn]
             if bin_res["bad"] == 1:
@@ -1315,9 +1315,9 @@ class IFUCube(object):
             stellar components.
         """
 
-        young = np.empty(self.data_cube.shape[1:]) * np.nan
-        inter = np.empty(self.data_cube.shape[1:]) * np.nan
-        old =  np.empty(self.data_cube.shape[1:]) * np.nan
+        young = np.full(self.data_cube.shape[1:], np.nan)
+        inter = np.full(self.data_cube.shape[1:], np.nan)
+        old =  np.full(self.data_cube.shape[1:], np.nan)
         age1_str = str(int(age1/1e6))+" Myr" if age1<1e9 else \
                    str(int(age1/1e9))+" Gyr"
         age2_str = str(int(age2/1e6))+" Myr" if age2<1e9 else \
@@ -1384,8 +1384,8 @@ class IFUCube(object):
             the zero-point as the value of the nucelus bin.
         """
 
-        v0 = np.empty(self.data_cube.shape[1:]) * np.nan
-        vd = np.empty(self.data_cube.shape[1:]) * np.nan
+        v0 = np.full(self.data_cube.shape[1:], np.nan)
+        vd = np.full(self.data_cube.shape[1:], np.nan)
         if norm_v0 == "nucleus":
             bn = self.get_loc_bin(self.nucleus)
             if bn is None:
@@ -1521,10 +1521,10 @@ class IFUCube(object):
 
         bin_nums, n_custom = self._get_bin_nums("nobad", custom=True)
         # Initialise an empty map to populate with Z values
-        Zmap = np.empty(self.data_cube.shape[1:]) * np.nan
-        Zvals = np.empty(len(bin_nums)) * np.nan
+        Zmap = np.full(self.data_cube.shape[1:], np.nan)
+        Zvals = np.full(len(bin_nums), np.nan)
         # Hold the mean, min and max distance of the bins from the nucleus
-        dists = np.empty((len(bin_nums), 3)) * np.nan
+        dists = np.full((len(bin_nums), 3), np.nan)
 
         for i,bn in enumerate(bin_nums):
             bin_res = self.results["bin"][bn]
@@ -1614,10 +1614,10 @@ class IFUCube(object):
         bin_nums, n_custom = self._get_bin_nums("nobad", custom=True)
         # Initialise an empty map to populate with values denoting:
         # 0 = Hii, 1 = Hii-> maximal starburst, 2 = AGN
-        valmap = np.empty(self.data_cube.shape[1:]) * np.nan
+        valmap = np.full(self.data_cube.shape[1:], np.nan)
         # Hold the line ratios for each bin:
         # ([NII]/Ha, uncert, [OIII]/Hb, uncert, val) per row
-        lineratios = np.empty((len(bin_nums), 5)) * np.nan
+        lineratios = np.full((len(bin_nums), 5), np.nan)
 
         for i,bn in enumerate(bin_nums):
             bin_res = self.results["bin"][bn]
@@ -1714,12 +1714,12 @@ class IFUCube(object):
         bin_nums, n_custom = self._get_bin_nums("nobad", custom=True)
         # Initialise an empty 4-layer map to populate
         val_maps_shape = (4, self.data_cube.shape[1], self.data_cube.shape[2])
-        val_maps = np.empty(val_maps_shape) * np.nan
+        val_maps = np.full(val_maps_shape, np.nan)
         # Also hold the data and uncerts in a list for the radial plots
-        val_list =  np.empty((len(bin_nums), 4)) * np.nan
-        val_uncert_list = np.empty((len(bin_nums), 4)) * np.nan
+        val_list =  np.full((len(bin_nums), 4), np.nan)
+        val_uncert_list = np.full((len(bin_nums), 4), np.nan)
         # Hold the mean, min and max distance of the bins from the nucleus
-        dists = np.empty((len(bin_nums), 3)) * np.nan
+        dists = np.full((len(bin_nums), 3), np.nan)
 
         for i,bn in enumerate(bin_nums):
             bin_res = self.results["bin"][bn]
@@ -2343,7 +2343,7 @@ def _model_to_res_dict(model, el, fobs_norm=1):
         print("no covariance matrix computed for bin {}, cannot"
               " compute fit uncertainties".format(model.name))
         dof = len(fitting._model_to_fit_params(model)[0])
-        fitted_uncerts = np.empty(dof) * np.nan
+        fitted_uncerts = np.full(dof, np.nan)
         res["bad"] = 1
     else:
         res["bad"] = 0
