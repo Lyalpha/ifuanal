@@ -25,6 +25,7 @@ vdev
    forbidden lines and one for Balmer.
  * Custom bins are now highlighted on the radial and cumulative metallicity
    plots.
+ * Statistical uncertainties on metallicity measurements are now calculated.
  * Emission line results for ``fwhm`` and ``offset`` (and their uncertainties)
    are now given in km/s.
  * The header card ``BUNIT`` is now queried in the `DATA` extension to get the
