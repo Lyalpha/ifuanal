@@ -1108,32 +1108,50 @@ class IFUCube(object):
                 emlines[line]["offset_uncert"] = mean_sig * ckms / rest
 
             # Determine metallcities where possible using SNR>3 lines only
-            if (emlines["Halpha_6563"]["snr"] > 3 and
-                emlines["[NII]_6583"]["snr"] > 3):
-                N2 = (np.log10(emlines["[NII]_6583"]["flux"]
-                               / emlines["Halpha_6563"]["flux"]))
-            else:
-                N2 = np.nan
-            if (emlines["[OIII]_5007"]["snr"] > 3 and
-                emlines["Hbeta_4861"]["snr"] > 3):
-                O3N2 = np.log10((emlines["[OIII]_5007"]["flux"]
-                                 / emlines["Hbeta_4861"]["flux"])
-                                / (10**N2))
-            else:
-                O3N2 = np.nan
-            if (emlines["[SII]_6716"]["snr"] > 3 and
-                emlines["[SII]_6731"]["snr"] > 3 and
-                emlines["[NII]_6583"]["snr"] > 3):
-                N2S2 = np.log10(emlines["[NII]_6583"]["flux"]
-                                / (emlines["[SII]_6716"]["flux"]
-                                   + emlines["[SII]_6731"]["flux"]))
-            else:
-                N2S2 = np.nan
+            # Make a short of [flux, flux uncert] to reduce clutter and set
+            # any with SNR < 3 to np.nan #FIXME
+            el = {}
+            for line, d in emlines.items():
+                if d["snr"] < 3:
+                    el[line] = (np.nan, np.nan)
+                else:
+                    el[line] = (d["flux"], d["flux_uncert"])
+            # N2
+            NII, NII_uncert = el["[NII]_6583"]
+            Ha, Ha_uncert = el["Halpha_6563"]
+            N2f = NII/Ha # in flux
+            N2f_uncert = N2f * ((NII_uncert/NII)**2 + (Ha_uncert/Ha)**2)**0.5
+            # O3N2
+            OIII, OIII_uncert = el["[OIII]_5007"]
+            Hb, Hb_uncert = el["Hbeta_4861"]
+            O3f = OIII/Hb
+            O3f_uncert = O3f * ((OIII_uncert/OIII)**2 + (Hb_uncert/Hb)**2)**0.5
+            O3N2f = O3f/N2f
+            O3N2f_uncert = O3N2f * ((O3f_uncert/O3f)**2
+                                    + (N2f_uncert/N2f)**2)**0.5
+            # S2
+            SII = el["[SII]_6716"][0] + el["[SII]_6731"][0]
+            SII_uncert = (el["[SII]_6716"][1]**2 + el["[SII]_6731"][1]**2)**0.5
+            S2f = NII/SII
+            S2f_uncert = S2f * ((NII_uncert/NII)**2 + (SII_uncert/SII)**2)**0.5
+            # Log of values
+            N2 = np.log10(N2f)
+            N2_uncert = 0.434 * (N2f_uncert/N2f) # uncertainty on log10(NII/Ha)
+            O3N2 = np.log10(O3f/N2f)
+            O3N2_uncert = 0.434 * (O3N2f_uncert/O3N2f)
+            S2 = np.log10(S2f)
+            S2_uncert = 0.434 * (S2f_uncert/S2f)
+            # Metallicity indicators and uncerts
+            PP04_N2 = [8.90 + 0.57 * N2, 0.57 * N2_uncert]
+            PP04_O3N2 =  [8.73 - 0.32 * O3N2, 0.32 * O3N2_uncert]
+            M13 = [8.533 - 0.214 * O3N2, 0.214 * O3N2_uncert]
+            D16 = [8.77 + S2 + 0.264 * N2, (S2_uncert**2 + (0.264*N2)**2)*0.5]
+            # Assign to dictionary
             bin_res["metallicity"] = {}
-            bin_res["metallicity"]["PP04_N2"] = 8.90 + 0.57 * N2
-            bin_res["metallicity"]["PP04_O3N2"] = 8.73 - 0.32 * O3N2
-            bin_res["metallicity"]["M13"] = 8.533 - 0.214 * O3N2
-            bin_res["metallicity"]["D16"] = 8.77 + N2S2 + 0.264 * N2
+            bin_res["metallicity"]["PP04_N2"] = PP04_N2
+            bin_res["metallicity"]["PP04_O3N2"] = PP04_O3N2
+            bin_res["metallicity"]["M13"] = M13
+            bin_res["metallicity"]["D16"] = D16
 
     def make_emission_line_cube(self, clobber=False):
         """
@@ -1522,18 +1540,18 @@ class IFUCube(object):
         bin_nums, n_custom = self._get_bin_nums("nobad", custom=True)
         # Initialise an empty map to populate with Z values
         Zmap = np.full(self.data_cube.shape[1:], np.nan)
-        Zvals = np.full(len(bin_nums), np.nan)
+        Zvals = np.full((len(bin_nums), 2), np.nan)
         # Hold the mean, min and max distance of the bins from the nucleus
         dists = np.full((len(bin_nums), 3), np.nan)
 
         for i,bn in enumerate(bin_nums):
             bin_res = self.results["bin"][bn]
             Z = bin_res["emission"]["metallicity"][indicator]
-            Zmap[bin_res["spax"][::-1]] = Z
+            Zmap[bin_res["spax"][::-1]] = Z[0]
             Zvals[i] = Z
             dists[i] = (bin_res["dist_mean"], bin_res["dist_min"],
                         bin_res["dist_max"])
-        Zvalsnn = Zvals[~np.isnan(Zvals)] # no nans
+        Zvalsnn = Zvals[~np.isnan(Zvals[:,0]), 0] # no nans
 
         plt.close("all")
         zfig = plt.figure()
@@ -1555,23 +1573,25 @@ class IFUCube(object):
                            bins=len(bin_nums), color=c.cmap(0.3))
         #    and show the custom bins highlighted
         for i in range(n_custom):
-            axcum.axvline(Zvals[i], color=c.cmap(0.9), lw=2)
+            axcum.axvline(Zvals[i, 0], color=c.cmap(0.9), lw=2)
         p[0].set_xy(p[0].get_xy()[:-1])
         axcum.set_xlim(min(Zvalsnn), np.max(Zvalsnn))
+        axcum.tick_params(axis="x", labelsize=10)
         axcum.set_ylim(0, 1)
         axcum.set_xlabel("$Z$ [$12 + \log_{10}(\\textrm{O/H})$]")
         axcum.set_ylabel("Cumulative Fraction")
 
         # A plot of the Z value vs radial distance from nucleus
         axrad = zfig.add_subplot(gs[1,1])
-        axrad.errorbar(dists[:,0], Zvals, xerr=[(dists[:,0]-dists[:,1]),
-                       (dists[:,2]-dists[:,0])], color=c.cmap(0.3), ls="none",
-                       marker="o", mew=0.3, ms=4, capsize=0,
-                       ecolor=c.cmap(0.3))
+        axrad.errorbar(dists[:,0], Zvals[:,0], xerr=[(dists[:,0]-dists[:,1]),
+                       (dists[:,2]-dists[:,0])], yerr=Zvals[:,1],
+                       color=c.cmap(0.3), ls="none", marker="o", mew=0.3,
+                       ms=4, capsize=0, ecolor=c.cmap(0.3))
         #    and show the custom bins highlighted
-        axrad.errorbar(dists[:n_custom,0], Zvals[:n_custom],
+        axrad.errorbar(dists[:n_custom,0], Zvals[:n_custom,0],
                        xerr=[(dists[:n_custom,0]-dists[:n_custom,1]),
                        (dists[:n_custom,2]-dists[:n_custom,0])],
+                       yerr=Zvals[:n_custom,1],
                        color=c.cmap(0.9), ls="none", marker="*", mew=0.3,
                        ms=9, capsize=0, ecolor=c.cmap(0.9))
         axrad.set_xlabel("Distance from nucleus [pixels]")
