@@ -563,6 +563,13 @@ plots the metallicity for the chosen
 indicator as a map aslongside the cumulative metallicity of the bins and a
 radial dependancy plot. Custom bins are highlighted.
 
+:meth:`~ifuanal.IFUCube.plot_bpt`
+"""""""""""""""""""""""""""""""""
+plots the BPT diagram for each bind along with a 2D map of bin classifications.
+Classification lines are taken from Kewley et al. (2013, ApJL, 774, 10) for the
+AGN-HII division and Kewley et al. (2001, ApJ, 556, 121) for the maximal star
+burst.
+
 .. Warning::
    :meth:`~ifuanal.IFUCube.plot_continuum` will fail if use more than
    6 metallicities are used in the STARLIGHT bases, or if the number of ages

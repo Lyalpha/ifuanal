@@ -14,7 +14,9 @@ vdev
    :meth:`~ifuanal.IFUCube._parse_continuum` and
    :meth:`~ifuanal.IFUCube._parse_emission`. They are automatically called
    after fitting so do not need to be explicitly called usually.
- * Added :meth:`~ifuanal.IFUCube.plot_line_map`.
+ * Added :meth:`~ifuanal.IFUCube.plot_line_map` to visualise the results for a
+   given emission line.
+ * Added :meth:`~ifuanal.IFUCube.plot_bpt` to produce a BPT diagram.
  * Exposed the filepath of the json emission lines file via the ``el_json``
    argument to :class:`~ifuanal.IFUCube` and :class:`~ifuanal.MUSECube`.
  * Emission line fitting now fits the the line widths of each entry in
