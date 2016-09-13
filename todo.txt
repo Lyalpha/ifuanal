@@ -1,9 +1,5 @@
 #TODOs
 
-#TODO    : Allow FWHM to vary between emission lines and keep only tied
-#          per entry (i.e. both [NII] are tied, but these are not tied
-#          to [OIII]
-
 #TODO    : rewrite binning methods to workers that return an array of just
 #          {"mean":.., "spax":...} then populate spectra/distances by
 #          master bin method.
