@@ -26,7 +26,7 @@ type ``object?`` from within an IPython session to find out about
 * Emission lines to fit are defined in the file `data/emissionlines.json`.
   Additional lines can be fit for by copying this file and manually adding new
   entries, and giving the filepath of this new file via the ``el_json``
-  argument. **The entries for `Halpha` and `[NII]` are required and should not be
+  argument. **The existing entries are required by the code and should not be
   removed or altered**. No sanity checking of the lines is done, so make sure
   they are sensible for the data being analysed (i.e. within the wavelength
   window of the cube).
@@ -82,7 +82,7 @@ small manipulation to the MUSE FITS file input before ingestion to
 
 ``IFUCube`` is then initialised which will set up the wavelength scale, check
 the STARLIGHT directory (:attr:`sl_dir`) exists, and load the emission line data
-from `data/emission_lines.json`.
+from ``el_json`` (default `data/emission_lines.json`).
 
 .. NOTE::
 
@@ -395,7 +395,7 @@ Emission line fitting
 ---------------------
 
 Emission line fitting is done with a set of single gaussians, one for each of
-the lines given in `data/emission_lines.json`.
+the lines given in ``el_json`` (default `data/emission_lines.json`).
 
 **The tl;dr version:** ::
 
@@ -412,14 +412,13 @@ The emission line model is formed from the addition of gaussians via
 `astropy\'s compound models
 <http://docs.astropy.org/en/stable/modeling/compound-models.html>`_ and is fit
 using a `Levenberg-Marquardt LSQ fitter
-<http://docs.astropy.org/en/stable/api/astropy.modeling.fitting.LevMarLSQFitter.html#astropy.modeling.fitting.LevMarLSQFitter>`_. This
-is constructed based on `data/emission_lines.json`.
+<http://docs.astropy.org/en/stable/api/astropy.modeling.fitting.LevMarLSQFitter.html#astropy.modeling.fitting.LevMarLSQFitter>`_.
 
 As with the :ref:`continuum fitting <cont-fitting>`, by default all bins (that
 have a valid STARLIGHT output) are fit, or a list of specific bins to be fit
 can be passed as ``bin_num``.
 
-Especially with lower SNR features, the fitter is suceptible to finding local
+Especially with lower SNR features, the fitter is susceptible to finding local
 minima in the LSQ sense and is sensitive to the inital guess for the
 amplitude, mean and standard deviation of the gaussians. To circumvent this a
 somewhat brute force method is overlaid on the fitter minimisation, as
