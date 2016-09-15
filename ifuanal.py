@@ -2059,7 +2059,7 @@ def get_Alamb(lamb, ebv, RV=3.1, lamb_unit=u.Unit("angstrom")):
     return Alamb
 
 
-def get_line_map(data_cube, lamb, line_lamb, filter_width=60, cont_width=60,
+def get_line_map(data_cube, lamb, line_lamb, filter_width=30, cont_width=30,
                  cont_pad=30):
     """
     Calculates a 2D continuum-subtracted emission line map.
