@@ -38,6 +38,9 @@ from voronoi import voronoi
 import dill as pickle
 import multiprocessing as mp
 
+# Stop numpy RuntimeWarnings (mainly to do with nans)
+np.seterr("ignore")
+
 # The file and directory path to this script
 FILEPATH = os.path.realpath(__file__)
 FILEDIR = os.path.dirname(FILEPATH)
@@ -377,18 +380,16 @@ class IFUCube(object):
 
         # Sum the data and stddev cubes to get signal and noise while
         # catching the warning when spaxels only have nans
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", category=RuntimeWarning)
-            signal = np.nanmean(self.data_cube.data[idx_low:idx_upp, :, :],
-                                axis=0)
-            noise = np.nanmean(self.stddev_cube.data[idx_low:idx_upp, :, :],
-                               axis=0)
-            if None not in (cont_lamb_low, cont_lamb_upp):
-                cont_idx_low = np.abs(self.lamb - cont_lamb_low).argmin()
-                cont_idx_upp = np.abs(self.lamb - cont_lamb_upp).argmin() + 1
-                cont = np.nanmean(self.data_cube.data[cont_idx_low:cont_idx_upp,
-                                                      :, :], axis=0)
-                signal = signal - cont
+        signal = np.nanmean(self.data_cube.data[idx_low:idx_upp, :, :],
+                            axis=0)
+        noise = np.nanmean(self.stddev_cube.data[idx_low:idx_upp, :, :],
+                           axis=0)
+        if None not in (cont_lamb_low, cont_lamb_upp):
+            cont_idx_low = np.abs(self.lamb - cont_lamb_low).argmin()
+            cont_idx_upp = np.abs(self.lamb - cont_lamb_upp).argmin() + 1
+            cont = np.nanmean(self.data_cube.data[cont_idx_low:cont_idx_upp,
+                                                  :, :], axis=0)
+            signal = signal - cont
 
         # Get the number of nans per spaxel, if its more than 20% of the
         # wavelength window we take this as a crap spectrum and throw it out
@@ -604,7 +605,7 @@ class IFUCube(object):
                                       figsize=(16,4),
                                       subplot_kw={"adjustable":"box-forced"})
             with warnings.catch_warnings():
-                warnings.simplefilter("ignore")
+                warnings.simplefilter("ignore", UserWarning)
                 ax[0].imshow(filt_map, origin="lower",
                              interpolation="none", norm=colors.PowerNorm(0.5))
                 ax[0].set_title("Filter")
@@ -1954,9 +1955,7 @@ class MUSECube(IFUCube):
             base_name = base_name[:-5]
         # The MUSE STAT cube extension is the variance of the data, we want the
         # standard deviation
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", category=RuntimeWarning)
-            cube_hdu[2].data = np.sqrt(cube_hdu[2].data)
+        cube_hdu[2].data = np.sqrt(cube_hdu[2].data)
 
         if ebv == "IRSA":
             ebv = get_IRSA_ebv(cube_hdu[1].header)
