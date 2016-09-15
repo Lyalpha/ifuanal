@@ -616,6 +616,8 @@ class IFUCube(object):
                 ax[2].set_title("Line")
                 ax[3].imshow(bin_map, origin="lower", interpolation="none",
                              cmap="viridis_r", norm=colors.PowerNorm(0.5))
+            ax[2].scatter(peak_xy[:,1], peak_xy[:,0], s=9, marker="x",
+                          c="w", alpha=0.5, lw=0.3)
             ax[3].set_title("Bins")
             binfig.suptitle("Filter centre at {}\\AA".format(line_lamb))
             binfig.savefig(self.base_name+"_bins_el.pdf", bbox_inches="tight")
