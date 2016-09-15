@@ -94,7 +94,7 @@ class IFUCube(object):
         self.data_cube = cube_hdu[1]
         self.stddev_cube = cube_hdu[2]
 
-        self.base_name = base_name
+        self.base_name = os.path.abspath(base_name)
 
         self.RV = RV
         self.data_shape = self.data_cube.data.shape
@@ -1888,7 +1888,7 @@ class IFUCube(object):
 
         # Write the cube HDUs to a fits file as they may be large!
         tempcube = tempfile.mkstemp(prefix="ifuanal_", suffix=".pkl.fits",
-                                    dir=".")[1]
+                                    dir=os.path.dirname(self.base_name))[1]
         print("writing cube to temporary file {}".format(tempcube))
         cube_hdu = fits.HDUList([self.prim_cube,
                                  self.data_cube,
