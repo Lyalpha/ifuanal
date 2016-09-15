@@ -253,9 +253,13 @@ class IFUCube(object):
             if np.any(np.isnan([xc,yc])):
                 raise ValueError("Couldn't find pixel location for {}"\
                                      .format(s.to_string(hmsdms)))
+        if isinstance(xc, str) or isinstance(yc, str):
+            print("coordinates given as string: if giving RA/DEC, set "
+                  "usewcs=True")
+            return
 
         if box_size == 0:
-            self.nucleus = np.array((xc, yc))
+            self.nucleus = np.array((round(xc,3), round(yc,3)))
             print("set nucleus as {}".format(self.nucleus))
             return
         elif not box_size <= xc <= self.data_shape[2] - box_size \
