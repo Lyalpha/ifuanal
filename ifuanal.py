@@ -341,9 +341,7 @@ class IFUCube(object):
             The wavelength limits of the continuum to subtract in calculating
             S/N (defaults to ``None``, ``None`` - i.e. no subtraction)
         clobber: bool, optional
-            Whether to overwrite an existing output. Searches for the file
-            ``base_name``+`_voronoibins.txt`, if this exists and ``clobber`` =
-            ``False`` then just use that.
+            Whether to overwrite any existing binning results.
         min_sn : float, optional
             The minimum S/N of a spaxel to be considered for the algorithm.
 
