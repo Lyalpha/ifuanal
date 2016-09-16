@@ -909,18 +909,21 @@ class IFUCube(object):
         basefiles = [os.path.join(d, f) for f in os.listdir(d)]
         Nbasefiles = len(basefiles)
         for i, basefile in enumerate(basefiles,1):
-            print("resampling base files {:>4}/{:4}".format(i,Nbasefiles),
+            print("resampling base files {:>4}/{:4}".format(i, Nbasefiles),
                   end="\r")
             resample_base(basefile, self.lamb, self.delta_lamb)
         print()
         # Compute the spectra and write the spectrum to a temp file
         spec_files = []
-        for bn in bin_num:
+        for i, bn in enumerate(bin_num):
+            print("writing spec files {}/{}".format(i, bn),
+                  end="\r")
             with tempfile.NamedTemporaryFile(prefix="spec_",dir=sl_tmp_dir,
                                              delete=False) as spec_file:
                 np.savetxt(spec_file, self.results["bin"][bn]["spec"],
                            fmt="%14.8f")
                 spec_files.append(spec_file.name)
+        print()
         # multiprocessing params for starlight pool of workers
         p = mp.Pool(self.n_cpu)
         bin_out_files = p.map(fit_starlight,
