@@ -453,8 +453,8 @@ class IFUCube(object):
         print("found {} bins".format(len(bin_nums)))
 
     def emission_line_bin(self, min_peak_flux, min_frac_flux, max_radius,
-                          min_flux, min_npix=8, line_lamb=6562.8, plot=True,
-                          clobber=False, **kwargs):
+                          min_flux, min_npix=8, line_lamb=6562.8, border=3,
+                          plot=True, clobber=False, **kwargs):
         """
         Apply the HII explorer [SFS]_ binning algorithm to the datacube.
 
@@ -490,6 +490,11 @@ class IFUCube(object):
             The minimum number of pixels required for a bin.
         line_lamb : float, optional
             The wavelength of the emission line to use (defaults to H$\\alpha$).
+        border : int, optional
+            The size of a border in pixels around all nans and the cube edges
+            to exclude peaks from. i.e. and peak found within ``border`` of the
+            edge of field of view or a masked region will not be used as a bin
+            seed.
         plot : bool, optional
             Whether to make a plot of the continuum, filter, line and bin maps.
         clobber : bool, optional
@@ -534,11 +539,11 @@ class IFUCube(object):
         line_map_max = ndimage.maximum_filter(line_map, size=3, mode="constant")
         # Get the location of the peaks and apply the minimum peak threshhold
         peaks = (line_map_max == line_map) & (line_map >= min_peak_flux)
-        # Remove all peaks within ``max_radius`` of the map edge
-        peaks[:r, :] = 0
-        peaks[-r:, :] = 0
-        peaks[:, :r] = 0
-        peaks[:, -r:] = 0
+        # Remove all peaks within ``border`` of the cube edge
+        peaks[:border, :] = 0
+        peaks[-border:, :] = 0
+        peaks[:, :border] = 0
+        peaks[:, -border:] = 0
         # Get locations in the map of the peaks and sort decending in flux
         sort_idx = line_map[peaks].argsort()[::-1]
         peak_xy = np.argwhere(peaks)[sort_idx]
@@ -557,19 +562,26 @@ class IFUCube(object):
                 #bin_peak_xy[i-1] = np.nan
                 continue
             print("processing bin seed {}/{}".format(i, n_peaks), end="\r")
+            # Check if we're close to nans (i.e. image border or masked
+            # region)
+            line_cutout = line_map[max(x-border,0):x+border+1,
+                                   max(y-border,0):y+border+1]
+            if np.any(np.isnan(line_cutout)):
+                continue
             peak_flux = line_map[x,y]
             thresh_flux = max(peak_flux * min_frac_flux, min_flux)
 
             # Make cutouts around our peak to check:
-            # - the distance of the spaxels
-            x_cen = np.arange(-r,r+1,1)
-            y_cen = np.arange(-r,r+1,1)
-            xx,yy = np.meshgrid(x_cen,y_cen)
+            #  the flux of the spaxels
+            fluxes = line_map[max(x-r,0):x+r+1, max(y-r,0):y+r+1]
+            #  if the spaxels have been previously assigned a bin
+            allocs = bin_map[max(x-r,0):x+r+1, max(y-r,0):y+r+1]
+            #  the distance of the spaxels (accounting for if we are close
+            #  to the edge of the array)
+            x_cen = np.arange(max(-r, -x),min(r+1, line_map.shape[0]-x) , 1)
+            y_cen = np.arange(max(-r, -y),min(r+1, line_map.shape[1]-y) , 1)
+            xx,yy = np.meshgrid(y_cen,x_cen)
             dists = np.sqrt(xx * xx + yy * yy)
-            # - the flux of the spaxels
-            fluxes = line_map[x-r:x+r+1, y-r:y+r+1]
-            # - if the spaxels have been preiously assigned a bin
-            allocs = bin_map[x-r:x+r+1, y-r:y+r+1]
 
             # If the spaxel passes these tests it is added to the bin
             bin_cutout = (dists <= max_radius) \
@@ -582,7 +594,7 @@ class IFUCube(object):
             bin_cutout[np.where(objs != objs[r,r])] = 0
             if np.sum(bin_cutout) >= min_npix:
                 # Update the bin_map with this bin number
-                bin_map[x-r:x+r+1, y-r:y+r+1][bin_cutout] = bn
+                bin_map[max(x-r,0):x+r+1, max(y-r,0):y+r+1][bin_cutout] = bn
                 # Add a bin entry to our dict
                 # We swap the x and y to FITS standard in the dict
                 xy_spax = np.where(bin_map == bn)[::-1]
