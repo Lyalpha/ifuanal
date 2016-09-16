@@ -27,9 +27,9 @@ type ``object?`` from within an IPython session to find out about
   Additional lines can be fit for by copying this file and manually adding new
   entries, and giving the filepath of this new file via the ``el_json``
   argument. **The existing entries are required by the code and should not be
-  removed or altered**. No sanity checking of the lines is done, so make sure
-  they are sensible for the data being analysed (i.e. within the wavelength
-  window of the cube).
+  removed or altered - they are needed for metallicity determinations**. No
+  sanity checking of the lines is done, so make sure they are sensible for the
+  data being analysed (i.e. within the wavelength window of the cube).
 
 .. NOTE::
 
@@ -561,6 +561,12 @@ the continuum fits as a map.
 plots the metallicity for the chosen
 indicator as a map aslongside the cumulative metallicity of the bins and a
 radial dependancy plot. Custom bins are highlighted.
+
+:meth:`~ifuanal.IFUCube.plot_line_map`
+""""""""""""""""""""""""""""""""""""""
+
+plots the EW, flux, velocity offset and FWHM of the chosen line (see
+:meth:`~ifuanal.IFUCube.plot_line_map` docs).
 
 :meth:`~ifuanal.IFUCube.plot_bpt`
 """""""""""""""""""""""""""""""""
