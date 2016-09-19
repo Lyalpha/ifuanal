@@ -985,6 +985,7 @@ class IFUCube(object):
             else:
                 print("no sl_output found for bin {}".format(bn))
                 bin_res["bad"] = 1
+        print()
 
     def run_emission_lines(self, bin_num=None, vd_init=[10.,40.,70.,100.],
                            v0_init=[-300,-200,-100,0,100,200,300],
