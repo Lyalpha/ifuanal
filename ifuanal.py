@@ -1163,11 +1163,13 @@ class IFUCube(object):
             O3N2_uncert = 0.434 * (O3N2f_uncert/O3N2f)
             S2 = np.log10(S2f)
             S2_uncert = 0.434 * (S2f_uncert/S2f)
+            y =  S2 + 0.264 * N2
+            y_uncert = (S2_uncert**2 + (0.264*N2)**2)*0.5
             # Metallicity indicators and uncerts
             PP04_N2 = [8.90 + 0.57 * N2, 0.57 * N2_uncert]
             PP04_O3N2 =  [8.73 - 0.32 * O3N2, 0.32 * O3N2_uncert]
             M13 = [8.533 - 0.214 * O3N2, 0.214 * O3N2_uncert]
-            D16 = [8.77 + S2 + 0.264 * N2, (S2_uncert**2 + (0.264*N2)**2)*0.5]
+            D16 = [8.77 + y + 0.45 * (y+0.3)**5, y_uncert]
             # Assign to dictionary
             bin_res["metallicity"] = {}
             bin_res["metallicity"]["PP04_N2"] = PP04_N2
