@@ -1923,7 +1923,8 @@ class IFUCube(object):
 
         # Write to a temporary file for safety - if there's pickling
         # errors, we don't want to overwrite our previous pickle.
-        temp = tempfile.mkstemp(prefix="ifuanal_", suffix=".pkl", dir=".")[1]
+        temp = tempfile.mkstemp(prefix="ifuanal_", suffix=".pkl"
+                                dir=os.path.dirname(self.base_name))[1]
         print("writing instance to temporary pickle file {}".format(temp))
         with open(temp, "wb") as output:
             pickle.dump(pkl_dict, output)
