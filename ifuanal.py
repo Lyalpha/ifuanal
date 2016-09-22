@@ -6,7 +6,7 @@ For the analysis of IFU data cubes.
 
 from __future__ import print_function
 
-__version__ = "0.3.0"
+__version__ = "0.3.dev"
 __author__ = "J. Lyman"
 
 from itertools import repeat, cycle, product
