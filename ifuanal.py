@@ -151,7 +151,7 @@ class IFUCube(object):
             return
         print("dereddening with E(B-V) = {:.3f}mag and RV = {}"
               .format(ebv, self.RV))
-        Alamb = get_Alamb(self.lamb, ebv, self.RV, self.lamb_unit)
+        Alamb = get_Alamb(self.lamb, ebv, self.RV, self.lamb_unit)[0]
         corr = 10**(0.4 * Alamb)
 
         # Multiply our flux and stddevs by the correction
@@ -1076,7 +1076,10 @@ class IFUCube(object):
         Calculate useful quantities from the fitted emission line model.
 
         The values are calculated for each bin in ``bin_num`` and are based
-        on the emission line models produced by run_emission_lines().
+        on the emission line models produced by run_emission_lines(). Fluxes
+        are corrected for the balmer decrement estimate of reddening. Where
+        this is not possible (i.e. SNR < 3 for Hbeta), the value of ``ebv``
+        is set to ``nan`` and no correction applied.
 
         Parameters
         ----------
@@ -1116,7 +1119,8 @@ class IFUCube(object):
                 # Find the lambda index of our line's mean and get the
                 # value of the continuum there for EW calculation
                 lamb_idx = np.abs(self.lamb - mean).argmin()
-                cont = bin_res_c["sl_spec"][lamb_idx, 2] * bin_res_c["fobs_norm"]
+                cont = (bin_res_c["sl_spec"][lamb_idx, 2] *
+                        bin_res_c["fobs_norm"])
                 emlines[line]["flux"] = flux
                 emlines[line]["flux_uncert"] = flux_uncert
                 emlines[line]["snr"] = flux/flux_uncert
@@ -1128,10 +1132,33 @@ class IFUCube(object):
                 emlines[line]["fwhm_uncert"] = to_fwhm(stddev_sig) * ckms / rest
                 emlines[line]["offset"] = (mean - rest) * ckms / rest
                 emlines[line]["offset_uncert"] = mean_sig * ckms / rest
+                emlines[line]["mean"] = mean
+                emlines[line]["mean_uncert"] = mean_sig
+            # Calculate E(B-V)_gas based on balmer decrement
+            # eq. 1 Kreckel et al. (1305.2923)
+            if (emlines["Hbeta_4861"]["snr"] > 3 and
+                emlines["Halpha_6563"]["snr"] > 3):
+                flux_Hb = emlines["Hbeta_4861"]["flux"]
+                flux_Ha = emlines["Halpha_6563"]["flux"]
+                lamb_Hb_Ha = (emlines["Hbeta_4861"]["rest_lambda"],
+                              emlines["Halpha_6563"]["rest_lambda"])
+                k_Hb, k_Ha = get_Alamb(lamb_Hb_Ha, 0.0)[1]
+                ebv = (2.5/(k_Hb - k_Ha)) * np.log10((flux_Ha/flux_Hb)/2.86)
+                # Correct fluxes for E(B-V)_gas
+                # FIXME uncertainty in E(B-V)_gas not propagated onto new
+                # dereddened fluxes (errors are correlated)
+                # FIXME correct continuum for E(B-V)_star and recalculate EW?
+                for line  in emlines:
+                    Alamb = get_Alamb(emlines[line]["mean"], ebv)[0]
+                    corr = 10**(0.4 * Alamb)
+                    emlines[line]["flux"] *= corr
+            else:
+                ebv = np.nan
+            bin_res["ebv"] = ebv
 
-            # Determine metallcities where possible using SNR>3 lines only
+            # Determine metallicities where possible using SNR>3 lines only
             # Make a short of [flux, flux uncert] to reduce clutter and set
-            # any with SNR < 3 to np.nan #FIXME
+            # any with SNR < 3 to np.nan
             el = {}
             for line, d in emlines.items():
                 if d["snr"] < 3:
@@ -2039,6 +2066,7 @@ def get_Alamb(lamb, ebv, RV=3.1, lamb_unit=u.Unit("angstrom")):
     .. [CCM89] Cardelli, Clayton \& Mathis, 1989, ApJ, 345, 245, "The \
        relationship between infrared, optical, and ultraviolet extinction"
     """
+    lamb = np.atleast_1d(lamb)
     # x in CCM is in 1/microns
     x = 1/(lamb * lamb_unit.to("micron"))
 
@@ -2076,9 +2104,10 @@ def get_Alamb(lamb, ebv, RV=3.1, lamb_unit=u.Unit("angstrom")):
                / ((x[nuv2] - 4.62)**2 + 0.263) + Fb)
 
     AV = RV * ebv
+    klamb = RV * (a + b/RV)
     Alamb = AV * (a + b/RV)
 
-    return Alamb
+    return (Alamb, klamb)
 
 
 def get_line_map(data_cube, lamb, line_lamb, filter_width=30, cont_width=30,
