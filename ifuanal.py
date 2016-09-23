@@ -981,6 +981,7 @@ class IFUCube(object):
                           .format(bin_res["sl_output"], bn))
                     bin_res["bad"] = 1
                     continue
+                sl_results["ebv_star"] = sl_results["AV_min"]/self.RV
                 bin_res.update(sl_results)
             else:
                 print("no sl_output found for bin {}".format(bn))
@@ -1119,8 +1120,9 @@ class IFUCube(object):
                 # Find the lambda index of our line's mean and get the
                 # value of the continuum there for EW calculation
                 lamb_idx = np.abs(self.lamb - mean).argmin()
+                cont_Alamb = get_Alamb(mean, bin_res_c["ebv_star"], self.RV)[0]
                 cont = (bin_res_c["sl_spec"][lamb_idx, 2] *
-                        bin_res_c["fobs_norm"])
+                        bin_res_c["fobs_norm"] * 10**(0.4 * cont_Alamb))
                 emlines[line]["flux"] = flux
                 emlines[line]["flux_uncert"] = flux_uncert
                 emlines[line]["snr"] = flux/flux_uncert
@@ -1142,19 +1144,20 @@ class IFUCube(object):
                 flux_Ha = emlines["Halpha_6563"]["flux"]
                 lamb_Hb_Ha = (emlines["Hbeta_4861"]["rest_lambda"],
                               emlines["Halpha_6563"]["rest_lambda"])
-                k_Hb, k_Ha = get_Alamb(lamb_Hb_Ha, 0.0)[1]
+                k_Hb, k_Ha = get_Alamb(lamb_Hb_Ha, 0.0, self.RV)[1]
                 ebv = (2.5/(k_Hb - k_Ha)) * np.log10((flux_Ha/flux_Hb)/2.86)
                 # Correct fluxes for E(B-V)_gas
                 # FIXME uncertainty in E(B-V)_gas not propagated onto new
                 # dereddened fluxes (errors are correlated)
                 # FIXME correct continuum for E(B-V)_star and recalculate EW?
                 for line  in emlines:
-                    Alamb = get_Alamb(emlines[line]["mean"], ebv)[0]
+                    Alamb = get_Alamb(emlines[line]["mean"], ebv, self.RV)[0]
                     corr = 10**(0.4 * Alamb)
                     emlines[line]["flux"] *= corr
+                    emlines[line]["ew"] *= corr
             else:
                 ebv = np.nan
-            bin_res["ebv"] = ebv
+            bin_res["ebv_gas"] = ebv
 
             # Determine metallicities where possible using SNR>3 lines only
             # Make a short of [flux, flux uncert] to reduce clutter and set
