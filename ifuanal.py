@@ -1510,7 +1510,6 @@ class IFUCube(object):
                                          bin_res["emission"])
 
         plt.close("all")
-
         # Determine how many zoomed-in windows on the full wavelength
         # range we need
         lambm = np.ma.masked_array(lamb, mask = np.ones(len(lamb)))
@@ -1805,7 +1804,7 @@ class IFUCube(object):
                 val_uncert_list[i,j] = val_uncert
                 dists[i] = (bin_res["dist_mean"], bin_res["dist_min"],
                         bin_res["dist_max"])
-
+        plt.close("all")
         lfig = plt.figure(figsize=(16,8))
         gs = gridspec.GridSpec(2, 4, height_ratios=[2, 1])
         propdict = {0:{"prop":"ew",
