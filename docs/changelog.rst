@@ -14,6 +14,9 @@ vdev
    :meth:`~ifuanal.IFUCube._parse_continuum` and
    :meth:`~ifuanal.IFUCube._parse_emission`. They are automatically called
    after fitting so do not need to be explicitly called usually.
+ * The Balmer decrement is calculated when parsing the emission line model and
+   an estimate of E(B-V)_gas is made to deredden the fluxes of the emission
+   lines.
  * Added :meth:`~ifuanal.IFUCube.plot_line_map` to visualise the results for a
    given emission line.
  * Added :meth:`~ifuanal.IFUCube.plot_bpt` to produce a BPT diagram.
@@ -26,8 +29,14 @@ vdev
  * Custom bins are now highlighted on the radial and cumulative metallicity
    plots.
  * Statistical uncertainties on metallicity measurements are now calculated.
+ * The Dopita et al. 2016 metallicity measurement now includes the polynomial
+   correction.
  * Emission line results for ``fwhm`` and ``offset`` (and their uncertainties)
    are now given in km/s.
+ * Initial bin seeds are now plotted on the bin map for emission line binning.
+ * Fixed the behaviour of emission line bin to now reject bin seeds within
+   ``border`` of a ``nan`` value rather than only within ``r`` of the edge of
+   the array.
  * The header card ``BUNIT`` is now queried in the `DATA` extension to get the
    flux units in order to label plots.
  * Removed ``use_tmp_dir`` and ``append`` arguments from :meth:`run_starlight`.
