@@ -916,7 +916,7 @@ class IFUCube(object):
         # Compute the spectra and write the spectrum to a temp file
         spec_files = []
         for i, bn in enumerate(bin_num):
-            print("writing spec files {}/{}".format(i, bn),
+            print("writing spec files {}/{}".format(i, len(bin_num)),
                   end="\r")
             with tempfile.NamedTemporaryFile(prefix="spec_",dir=sl_tmp_dir,
                                              delete=False) as spec_file:
