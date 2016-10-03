@@ -252,7 +252,7 @@ the subsequent growth of the bins will merge nearby peaks.
      flux.
    * is not already been allocated a bin.
 
-The resulting bins are then saved in :attr:``results["bin"]``. By default a
+The resulting bins are then saved in ``cube.results["bin"]``. By default a
 plot of the emission line map creation and the bins will be produced and saved
 as `_bins_el.pdf`.
 
@@ -279,7 +279,7 @@ subtracting off a continuum SNR (see docs for
   found [n] bins
 
 
-The resulting bins are then saved in :attr:``results["bin"]``. By default a
+The resulting bins are then saved in ``cube.results["bin"]``. By default a
 plot of the bins and their S/N will be produced and saved as `_bins_vor.pdf`.
 
 .. _custom-bins:
@@ -290,7 +290,7 @@ Adding custom bins
 Custom bins can be added by defining a centre and radius. These bins will have
 negative bin numbers beginning at ``-1`` in results.
 
-As an example we make an SDSS-like 3 arcsec fibre on the galaxy nucleus: ::
+As an example we make an SDSS-like 2 arcsec fibre on the galaxy nucleus: ::
 
   >>> cube.add_custom_bin([160.592, 166.442], 2/0.2)
   "added custom bin -1 to the list"
@@ -306,8 +306,8 @@ added) can be accessed via the bin number -1 in the :ref:`results-dict`
 
 .. WARNING::
 
-   Where spaxels are included in multiple bins, the plots will not represent
-   these correctly (or consistently?).
+   Where spaxels are included in multiple bins, the 2D map plots will not
+   represent these correctly (or consistently?).
 
 .. _cont-fitting:
 
