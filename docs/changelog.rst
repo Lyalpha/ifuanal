@@ -41,6 +41,7 @@ vdev
    flux units in order to label plots.
  * Removed ``use_tmp_dir`` and ``append`` arguments from :meth:`run_starlight`.
  * Fixed bug in calculation of bin distances from nucleus.
+ * Removed unused components in bundled bc03 base.
 
 v0.3.0
 ------

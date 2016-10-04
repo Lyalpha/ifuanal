@@ -915,7 +915,7 @@ class IFUCube(object):
         print()
         # Compute the spectra and write the spectrum to a temp file
         spec_files = []
-        for i, bn in enumerate(bin_num):
+        for i, bn in enumerate(bin_num, 1):
             print("writing spec files {}/{}".format(i, len(bin_num)),
                   end="\r")
             with tempfile.NamedTemporaryFile(prefix="spec_",dir=sl_tmp_dir,
@@ -1042,7 +1042,7 @@ class IFUCube(object):
         if not clobber:
             for bn in bin_num:
                 try:
-                    self.results["bin"]["emission"]["chi2dof"]
+                    self.results["bin"][bn]["emission"]["chi2dof"]
                 except KeyError:
                     pass
                 else:
