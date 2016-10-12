@@ -179,9 +179,12 @@ class IFUCube(object):
         self.data_cube.header["CRPIX3"] /= 1. + z # ref pix lambda
         self.data_cube.header["CD3_3"]  /= 1. + z # delta lambda
         # Update stddev header
-        self.stddev_cube.header["CRVAL3"] /= 1. + z
-        self.stddev_cube.header["CRPIX3"] /= 1. + z
-        self.stddev_cube.header["CD3_3"]  /= 1. + z
+        try:
+            self.stddev_cube.header["CRVAL3"] /= 1. + z
+            self.stddev_cube.header["CRPIX3"] /= 1. + z
+            self.stddev_cube.header["CD3_3"]  /= 1. + z
+        except KeyError:
+            print("warning: couldn't update stddev header wavelength scale")
         # The cube is now restframe
         self.prim_cube.header["IFU_Z"] = 0.
 
