@@ -1619,7 +1619,7 @@ class IFUCube(object):
         # Remove any bins without a metallicity determined
         Zvalsnn = Zvals[~np.isnan(Zvals[:,0]), 0]
         if cumweight:
-            weights = Wvals[~np.isnan(Zvals[:,0]), 0]
+            weights = Wvals[~np.isnan(Zvals[:,0])]
         else:
             weights = None
 
