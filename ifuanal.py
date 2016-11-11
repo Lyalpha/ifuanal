@@ -1574,7 +1574,7 @@ class IFUCube(object):
                       bbox_inches="tight", dpi=300)
         print("plot saved to {}_el_fit_{}.png".format(self.base_name, bin_num))
 
-    def plot_metallicity(self, indicator="D16"):
+    def plot_metallicity(self, indicator="D16", cumweight=False):
         """
         Plot the metallicity of the host.
 
@@ -1587,6 +1587,10 @@ class IFUCube(object):
         indicator: str
             The metallicity indicator to plot, current options are "PP04_N2",
             "PP04_O3N2", "M13", "D16".
+        cumweight: bool, optional
+            If ``True``, the contribution of each bin to the cumulative
+            histogram of metallicities will be weighted by its flux in
+            "Halpha_6563".
         """
         valid_indicators = ["PP04_N2", "PP04_O3N2", "M13", "D16"]
         if indicator not in valid_indicators:
@@ -1596,7 +1600,10 @@ class IFUCube(object):
         bin_nums, n_custom = self._get_bin_nums("nobad", custom=True)
         # Initialise an empty map to populate with Z values
         Zmap = np.full(self.data_cube.shape[1:], np.nan)
+        # Store the metallicity values and uncertainties
         Zvals = np.full((len(bin_nums), 2), np.nan)
+        # and Halpha flux for cumulative weighting, if needed
+        Wvals = np.full((len(bin_nums)), np.nan)
         # Hold the mean, min and max distance of the bins from the nucleus
         dists = np.full((len(bin_nums), 3), np.nan)
 
@@ -1607,7 +1614,14 @@ class IFUCube(object):
             Zvals[i] = Z
             dists[i] = (bin_res["dist_mean"], bin_res["dist_min"],
                         bin_res["dist_max"])
-        Zvalsnn = Zvals[~np.isnan(Zvals[:,0]), 0] # no nans
+            if cumweight:
+                Wvals[i] = bin_res["emission"]["lines"]["Halpha_6563"]["flux"]
+        # Remove any bins without a metallicity determined
+        Zvalsnn = Zvals[~np.isnan(Zvals[:,0]), 0]
+        if cumweight:
+            weights = Wvals[~np.isnan(Zvals[:,0]), 0]
+        else:
+            weights = None
 
         plt.close("all")
         zfig = plt.figure()
@@ -1624,7 +1638,7 @@ class IFUCube(object):
 
         # A cumulative histogram of the Z values
         axcum = zfig.add_subplot(gs[0,1])
-        n,b,p = axcum.hist(Zvalsnn, cumulative=True,
+        n,b,p = axcum.hist(Zvalsnn, weights=weights, cumulative=True,
                            normed=True, histtype="step", linewidth=3,
                            bins=len(bin_nums), color=c.cmap(0.3))
         #    and show the custom bins highlighted

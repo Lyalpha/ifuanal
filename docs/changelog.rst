@@ -42,6 +42,9 @@ vdev
  * Removed ``use_tmp_dir`` and ``append`` arguments from :meth:`run_starlight`.
  * Fixed bug in calculation of bin distances from nucleus.
  * Removed unused components in bundled bc03 base.
+ * Added ``cumweight`` option to :meth:`plot_metallicity`. This will weight
+   the cumulative metallicity plot by the H\ :math:`\alpha` flux of each bin,
+   as a proxy for the SFR.
 
 v0.3.0
 ------

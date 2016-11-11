@@ -558,9 +558,11 @@ the continuum fits as a map.
 
 :meth:`~ifuanal.IFUCube.plot_metallicity`
 """""""""""""""""""""""""""""""""""""""""
-plots the metallicity for the chosen
-indicator as a map aslongside the cumulative metallicity of the bins and a
-radial dependancy plot. Custom bins are highlighted.
+plots the metallicity for the chosen indicator as a map aslongside the
+cumulative metallicity of the bins and a radial dependancy plot. If the
+argument ``cumweight`` is ``True`` then the cumulative plot is weighted
+by the SFR of each bin (i.e. the H\ :math:`\alpha` flux).
+Custom bins are highlighted.
 
 :meth:`~ifuanal.IFUCube.plot_line_map`
 """"""""""""""""""""""""""""""""""""""
