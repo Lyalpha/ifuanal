@@ -75,12 +75,12 @@ small manipulation to the MUSE FITS file input before ingestion to
   reference pixel of the cube (this requires the optional dependancy
   :mod:`astroquery` to be installed).
 * Add a PRIMARY header card `IFU_Z` specifying the redshift. In the example
-  case this is `0.008138`
+  case this is `0.007138`
 * The MUSE data `STAT` extension gives the variance of the science
   data. ``IFUCube`` wants the standard deviation and so we square root this
   extension.
 
-``IFUCube`` is then initialised which will set up the wavelength scale, check
+``IFUCube`` is then initialised - this will set up the wavelength scale, check
 the STARLIGHT directory (:attr:`sl_dir`) exists, and load the emission line data
 from ``el_json`` (default `data/emission_lines.json`).
 
@@ -154,7 +154,7 @@ simply eyeballing the cube. This can be given in pixel coordinates or RA and
 DEC if the argument ``usewcs = True``. The centre is found by fitting a 2D
 gaussian to a region around this initial guess.
 
-To resolve poor fits look at the docs for :meth:`~ifuanal.IFUCube.set_nucleus`,
+To correct bad fits, look at the docs for :meth:`~ifuanal.IFUCube.set_nucleus`,
 since there are other arguments to play with, as well as the option to specify
 a location outside the FOV. ::
 
