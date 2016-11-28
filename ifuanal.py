@@ -1126,38 +1126,34 @@ class IFUCube(object):
                 cont_Alamb = get_Alamb(mean, bin_res_c["ebv_star"], self.RV)[0]
                 cont = (bin_res_c["sl_spec"][lamb_idx, 2] *
                         bin_res_c["fobs_norm"] * 10**(0.4 * cont_Alamb))
-                emlines[line]["flux"] = flux
-                emlines[line]["flux_uncert"] = flux_uncert
+                emlines[line]["flux"] = [flux, flux_uncert]
                 emlines[line]["snr"] = flux/flux_uncert
-                emlines[line]["ew"] = flux/cont
-                emlines[line]["ew_uncert"] = flux_uncert/cont
+                emlines[line]["ew"] = [flux/cont, flux_uncert/cont]
                 to_fwhm = lambda x: x * 2 * (2*math.log(2))**0.5
                 rest = emlines[line]["rest_lambda"]
-                emlines[line]["fwhm"] = to_fwhm(stddev) * ckms / rest
-                emlines[line]["fwhm_uncert"] = to_fwhm(stddev_sig) * ckms / rest
-                emlines[line]["offset"] = (mean - rest) * ckms / rest
-                emlines[line]["offset_uncert"] = mean_sig * ckms / rest
-                emlines[line]["mean"] = mean
-                emlines[line]["mean_uncert"] = mean_sig
+                emlines[line]["fwhm"] = [to_fwhm(stddev) * ckms / rest,
+                                         to_fwhm(stddev_sig) * ckms / rest]
+                emlines[line]["offset"] = [(mean - rest) * ckms / rest,
+                                           mean_sig * ckms / rest]
+                emlines[line]["mean"] = [mean, mean_sig]
             # Calculate E(B-V)_gas based on balmer decrement
             # eq. 1 Kreckel et al. (1305.2923)
             if (emlines["Hbeta_4861"]["snr"] > 3 and
                 emlines["Halpha_6563"]["snr"] > 3):
-                flux_Hb = emlines["Hbeta_4861"]["flux"]
-                flux_Ha = emlines["Halpha_6563"]["flux"]
-                lamb_Hb_Ha = (emlines["Hbeta_4861"]["rest_lambda"],
-                              emlines["Halpha_6563"]["rest_lambda"])
+                flux_Hb = emlines["Hbeta_4861"]["flux"][0]
+                flux_Ha = emlines["Halpha_6563"]["flux"][0]
+                lamb_Hb_Ha = [emlines["Hbeta_4861"]["rest_lambda"],
+                              emlines["Halpha_6563"]["rest_lambda"]]
                 k_Hb, k_Ha = get_Alamb(lamb_Hb_Ha, 0.0, self.RV)[1]
                 ebv = (2.5/(k_Hb - k_Ha)) * np.log10((flux_Ha/flux_Hb)/2.86)
                 # Correct fluxes for E(B-V)_gas
                 # FIXME uncertainty in E(B-V)_gas not propagated onto new
                 # dereddened fluxes (errors are correlated)
-                # FIXME correct continuum for E(B-V)_star and recalculate EW?
                 for line  in emlines:
-                    Alamb = get_Alamb(emlines[line]["mean"], ebv, self.RV)[0]
+                    Alamb = get_Alamb(emlines[line]["mean"][0], ebv, self.RV)[0]
                     corr = 10**(0.4 * Alamb)
-                    emlines[line]["flux"] *= corr
-                    emlines[line]["ew"] *= corr
+                    emlines[line]["flux"][0] *= corr
+                    emlines[line]["ew"][0] *= corr
             else:
                 ebv = np.nan
             bin_res["ebv_gas"] = ebv
@@ -1170,7 +1166,7 @@ class IFUCube(object):
                 if d["snr"] < 3:
                     el[line] = (np.nan, np.nan)
                 else:
-                    el[line] = (d["flux"], d["flux_uncert"])
+                    el[line] = d["flux"]
             # N2
             NII, NII_uncert = el["[NII]_6583"]
             Ha, Ha_uncert = el["Halpha_6563"]
@@ -1615,7 +1611,8 @@ class IFUCube(object):
             dists[i] = (bin_res["dist_mean"], bin_res["dist_min"],
                         bin_res["dist_max"])
             if cumweight:
-                Wvals[i] = bin_res["emission"]["lines"]["Halpha_6563"]["flux"]
+                Wvals[i] = (bin_res["emission"]["lines"]["Halpha_6563"]
+                            ["flux"][0])
         # Remove any bins without a metallicity determined
         Zvalsnn = Zvals[~np.isnan(Zvals[:,0]), 0]
         if cumweight:
@@ -1711,11 +1708,10 @@ class IFUCube(object):
 
         for i,bn in enumerate(bin_nums):
             bin_res = self.results["bin"][bn]
-            f = [bin_res["emission"]["lines"][line]["flux"] for line in
+            f = [bin_res["emission"]["lines"][line]["flux"][0] for line in
                  ("[NII]_6583", "Halpha_6563", "[OIII]_5007", "Hbeta_4861")]
-            fu = [bin_res["emission"]["lines"][line]["flux_uncert"] for
-                  line in ("[NII]_6583", "Halpha_6563",
-                           "[OIII]_5007", "Hbeta_4861")]
+            fu = [bin_res["emission"]["lines"][line]["flux"][1] for line in
+                  ("[NII]_6583", "Halpha_6563", "[OIII]_5007", "Hbeta_4861")]
             NIIHa = f[0]/f[1]
             NIIHa_uncert = NIIHa * ((fu[0]/f[0])**2 + (fu[1]/f[1])**2)**0.5
             OIIIHb = f[2]/f[3]
@@ -1817,8 +1813,7 @@ class IFUCube(object):
             if bin_res["emission"]["lines"][line]["snr"] < 3:
                 continue
             for j,prop in enumerate(("ew", "flux", "offset", "fwhm")):
-                val = bin_res["emission"]["lines"][line][prop]
-                val_uncert = bin_res["emission"]["lines"][line][prop+"_uncert"]
+                val, val_uncert = bin_res["emission"]["lines"][line][prop]
                 val_maps[j][bin_res["spax"][::-1]] = val
                 val_list[i,j] = val
                 val_uncert_list[i,j] = val_uncert
