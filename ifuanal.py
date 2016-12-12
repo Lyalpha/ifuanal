@@ -789,6 +789,10 @@ class IFUCube(object):
         ``_get_single_spectrum``.
 
         """
+        x = np.ravel(np.asarray(x))
+        y = np.ravel(np.asarray(y))
+        if x.size != y.size:
+            raise AttributeError("``x`` and ``y`` should be same size")
         # Use weighted arthimetic mean and variance of weighted mean
         # arrays to hold all the flux and flux_stddev values in spaxels
         spaxels_flux = self.data_cube.data[:,y,x] # numpy axes switch
@@ -807,11 +811,12 @@ class IFUCube(object):
         # Use masked arrays to cover the nans while preserving shape
         spaxels_flux_ma = np.ma.masked_array(spaxels_flux, bad_idx)
         spaxels_stddev_ma = np.ma.masked_array(spaxels_stddev, bad_idx)
-        # Calculate the weighted mean and stddev
+        # Calculate the weighted mean and stddev and multiply by num spaxels
+        # to conserve flux of the bin
         w = 1/spaxels_stddev_ma**2
-        spec[:,1] = np.ma.average(spaxels_flux_ma, weights=w, axis=1)
+        spec[:,1] = np.ma.average(spaxels_flux_ma, weights=w, axis=1) * x.size
         var = np.ma.average(spaxels_stddev_ma**2, weights=w, axis=1)
-        spec[:,2] = np.ma.sqrt(var)
+        spec[:,2] = np.ma.sqrt(var) * x.size
         # STARLIGHT ignores flags >=2
         spec[:,3] = bad_lamb.astype("int") * 2
 
