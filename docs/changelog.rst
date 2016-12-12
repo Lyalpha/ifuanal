@@ -33,12 +33,16 @@ vdev
    correction.
  * Emission line results for ``fwhm`` and ``offset`` (and their uncertainties)
    are now given in km/s.
+ * Emission line results are now length 2 tuples of (value, uncert) and the
+   defunct entries (e.g. ``flux_uncert``, ``fwhm_uncert``) are removed.
  * Initial bin seeds are now plotted on the bin map for emission line binning.
  * Fixed the behaviour of emission line bin to now reject bin seeds within
    ``border`` of a ``nan`` value rather than only within ``r`` of the edge of
    the array.
  * The header card ``BUNIT`` is now queried in the `DATA` extension to get the
    flux units in order to label plots.
+ * The spectra returned by :meth:`_get_weighted_spectrum` are now multiplied
+   by the number of spaxels in the bin to conserve flux.
  * Removed ``use_tmp_dir`` and ``append`` arguments from :meth:`run_starlight`.
  * Fixed bug in calculation of bin distances from nucleus.
  * Removed unused components in bundled bc03 base.
