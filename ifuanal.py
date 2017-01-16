@@ -457,7 +457,7 @@ class IFUCube(object):
 
     def emission_line_bin(self, min_peak_flux, min_frac_flux, max_radius,
                           min_flux, min_npix=8, line_lamb=6562.8, border=3,
-                          plot=True, clobber=False, **kwargs):
+                          smooth=1, plot=True, clobber=False, **kwargs):
         """
         Apply the HII explorer [SFS]_ binning algorithm to the datacube.
 
@@ -498,6 +498,9 @@ class IFUCube(object):
             to exclude peaks from. i.e. and peak found within ``border`` of the
             edge of field of view or a masked region will not be used as a bin
             seed.
+        smooth : float, optional
+            The width of the gaussian filter to use when smoothing the emission
+            line map, prior to peak detection, set to zero to skip smoothing.
         plot : bool, optional
             Whether to make a plot of the continuum, filter, line and bin maps.
         clobber : bool, optional
@@ -539,9 +542,12 @@ class IFUCube(object):
 
         # Find peaks in the line_map, these can be quite close together
         # as we will grow/merge them later with the HII explorer algorithm
-        line_map_max = ndimage.maximum_filter(line_map, size=3, mode="constant")
+        smooth_line_map = ndimage.filters.gaussian_filter(line_map, smooth)
+        line_map_max = ndimage.maximum_filter(smooth_line_map, size=3,
+                                              mode="constant")
         # Get the location of the peaks and apply the minimum peak threshhold
-        peaks = (line_map_max == line_map) & (line_map >= min_peak_flux)
+        peaks = ((line_map_max == smooth_line_map)
+                 & (line_map >= min_peak_flux))
         # Remove all peaks within ``border`` of the cube edge
         peaks[:border, :] = 0
         peaks[-border:, :] = 0
@@ -626,14 +632,18 @@ class IFUCube(object):
                 ax[0].imshow(filt_map, origin="lower",
                              interpolation="none", norm=colors.PowerNorm(0.5))
                 ax[0].set_title("Filter")
+                ax[0].autoscale(False)
                 ax[1].imshow(cont_map, origin="lower",
                              interpolation="none", norm=colors.PowerNorm(0.5))
                 ax[1].set_title("Continuum")
+                ax[1].autoscale(False)
                 ax[2].imshow(line_map, origin="lower",
                              interpolation="none", norm=colors.PowerNorm(0.5))
                 ax[2].set_title("Line")
+                ax[2].autoscale(False)
                 ax[3].imshow(bin_map, origin="lower", interpolation="none",
                              cmap="viridis_r", norm=colors.PowerNorm(0.5))
+                ax[3].autoscale(False)
             ax[2].scatter(peak_xy[:,1], peak_xy[:,0], s=9, marker="x",
                           c="w", alpha=0.5, lw=0.3)
             ax[3].set_title("Bins")
