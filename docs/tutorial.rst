@@ -240,11 +240,16 @@ Briefly, the method is:
 by simulating a narrowband filter observation of the datacube and subtracting a
 continuum determined by two neighbouring filters.
 
-2. All peaks equal to or above ``min_peak_flux`` in this map are found via
-:func:`scipy.ndimage.maximum_filter`. These peaks are allowed to be close since
-the subsequent growth of the bins will merge nearby peaks.
+2. The emission line map is filtered with a gaussian, whose width is given by
+   the ``smooth`` argument. This helps to avoid picking noise peaks in the
+   wings of bright emission regions, but this can be skipped by setting
+   ``smooth`` to zero.
 
-3. Starting with the brightest, these peaks are the seeds for new bins. All
+3. All peaks equal to or above ``min_peak_flux`` in the emission line map are
+found via :func:`scipy.ndimage.maximum_filter`. These peaks are allowed to be
+close since the subsequent growth of the bins will merge nearby peaks.
+
+4. Starting with the brightest, these peaks are the seeds for new bins. All
    nearby pixels that satisfying the following are included in the bin:
 
    * within ``max_radius`` of peak.
