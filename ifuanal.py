@@ -2386,7 +2386,7 @@ def fit_emission_lines(fargs):
     # to be emission features
     for sm in best_fit.submodel_names:
         if best_fit[sm].amplitude.value < 0:
-            best_fit[sm].amplitude.value = 0
+            best_fit[sm].amplitude.value = np.nan
 
     # Save all parameters for the model and uncertainties.
     res = _model_to_res_dict(best_fit, el, bin_res["continuum"]["fobs_norm"])
