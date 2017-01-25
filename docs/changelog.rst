@@ -49,6 +49,9 @@ vdev
  * Added ``cumweight`` option to :meth:`plot_metallicity`. This will weight
    the cumulative metallicity plot by the H\ :math:`\alpha` flux of each bin,
    as a proxy for the SFR.
+ * Added ``smooth`` parameter to :meth:`emission_line_bin` to smooth the line
+   map before peak detection.
+ * BPT plot is only made for bins with S/N > 3 for all relevant line fluxes.
 
 v0.3.0
 ------
