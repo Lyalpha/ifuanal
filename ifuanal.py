@@ -1723,10 +1723,16 @@ class IFUCube(object):
 
         for i,bn in enumerate(bin_nums):
             bin_res = self.results["bin"][bn]
+            lines = ("[NII]_6583", "Halpha_6563", "[OIII]_5007", "Hbeta_4861")
+            snr = np.array([bin_res["emission"]["lines"][line]["snr"]
+                            for line in lines])
+            # Do not plot for any bins without significant line detections
+            if any(snr < 3):
+                continue
             f = [bin_res["emission"]["lines"][line]["flux"][0] for line in
-                 ("[NII]_6583", "Halpha_6563", "[OIII]_5007", "Hbeta_4861")]
+                 lines]
             fu = [bin_res["emission"]["lines"][line]["flux"][1] for line in
-                  ("[NII]_6583", "Halpha_6563", "[OIII]_5007", "Hbeta_4861")]
+                  lines]
             NIIHa = f[0]/f[1]
             NIIHa_uncert = NIIHa * ((fu[0]/f[0])**2 + (fu[1]/f[1])**2)**0.5
             OIIIHb = f[2]/f[3]
@@ -2385,8 +2391,8 @@ def fit_emission_lines(fargs):
     # matrix, so here we correct any negative amplitudes since these are suppose
     # to be emission features
     for sm in best_fit.submodel_names:
-        if best_fit[sm].amplitude.value < 0:
-            best_fit[sm].amplitude.value = np.nan
+        if best_fit[sm].amplitude.value <= 0:
+            best_fit[sm].amplitude.value = 0
 
     # Save all parameters for the model and uncertainties.
     res = _model_to_res_dict(best_fit, el, bin_res["continuum"]["fobs_norm"])
