@@ -1766,9 +1766,9 @@ class IFUCube(object):
         axmap.plot(self.nucleus[0], self.nucleus[1], "kx", markersize=10)
         # The BPT scatter plot
         # get the rows for each type so we can colour differently on plot
-        hii = np.argwhere(lineratios[:,4] == 0)
-        sb = np.argwhere(lineratios[:,4] == 1)
-        agn = np.argwhere(lineratios[:,4] == 2)
+        hii = lineratios[:,4] == 0
+        sb = lineratios[:,4] == 1
+        agn = lineratios[:,4] == 2
         axrat = vfig.add_subplot(gs[0,1])
         x0 = np.linspace(-2, 0.02+0.1832*self._z, 100)
         x1 = np.linspace(-2, 0.46, 100)
