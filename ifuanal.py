@@ -943,7 +943,8 @@ class IFUCube(object):
                 spec_files.append(spec_file.name)
         print()
         # multiprocessing params for starlight pool of workers
-        p = mp.Pool(self.n_cpu)
+        n_cpu = min(self.n_cpu, len(bin_num))
+        p = mp.Pool(n_cpu)
         bin_out_files = p.map(fit_starlight,
                               zip(bin_num,
                                   spec_files,
@@ -1070,7 +1071,8 @@ class IFUCube(object):
 
         print("fitting emission lines to {} bins...".format(len(bin_num)))
         # multiprocessing params for emission line fitting pool of workers
-        p = mp.Pool(self.n_cpu)
+        n_cpu = min(self.n_cpu, len(bin_num))
+        p = mp.Pool(n_cpu)
         emline_results = p.map(fit_emission_lines,
                                zip(bin_num,
                                    [self.results["bin"][bn] for bn in bin_num],
