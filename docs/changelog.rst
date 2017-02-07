@@ -29,8 +29,6 @@ vdev
  * Custom bins are now highlighted on the radial and cumulative metallicity
    plots.
  * Statistical uncertainties on metallicity measurements are now calculated.
- * The Dopita et al. 2016 metallicity measurement now includes the polynomial
-   correction.
  * Emission line results for ``fwhm`` and ``offset`` (and their uncertainties)
    are now given in km/s.
  * Emission line results are now length 2 tuples of (value, uncert) and the

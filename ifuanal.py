@@ -1652,9 +1652,10 @@ class IFUCube(object):
 
         # A cumulative histogram of the Z values
         axcum = zfig.add_subplot(gs[0,1])
+        bin_edges = np.append(np.sort(Zvalsnn),np.max(Zvalsnn)+1e-9)
         n,b,p = axcum.hist(Zvalsnn, weights=weights, cumulative=True,
                            normed=True, histtype="step", linewidth=3,
-                           bins=len(bin_nums), color=c.cmap(0.3))
+                           bins=bin_edges, color=c.cmap(0.3))
         #    and show the custom bins highlighted
         for i in range(n_custom):
             axcum.axvline(Zvals[i, 0], color=c.cmap(0.9), lw=2)
