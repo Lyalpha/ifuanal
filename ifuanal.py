@@ -1215,7 +1215,7 @@ class IFUCube(object):
             PP04_N2 = [8.90 + 0.57 * N2, 0.57 * N2_uncert]
             PP04_O3N2 =  [8.73 - 0.32 * O3N2, 0.32 * O3N2_uncert]
             M13 = [8.533 - 0.214 * O3N2, 0.214 * O3N2_uncert]
-            D16 = [8.77 + y + 0.45 * (y+0.3)**5, y_uncert]
+            D16 = [8.77 + y, y_uncert]
             # Assign to dictionary
             bin_res["metallicity"] = {}
             bin_res["metallicity"]["PP04_N2"] = PP04_N2
