@@ -158,7 +158,7 @@ To correct bad fits, look at the docs for :meth:`~ifuanal.IFUCube.set_nucleus`,
 since there are other arguments to play with, as well as the option to specify
 a location outside the FOV. ::
 
-  >>> cube.set_nucleus([162, 167])
+  >>> cube.set_nucleus(162, 167)
   set nucleus as (160.592, 166.442)
 
 By default this will also produce a plot `_nucleus.pdf` showing the data, model
