@@ -826,7 +826,7 @@ class IFUCube(object):
         w = 1/spaxels_stddev_ma**2
         spec[:,1] = np.ma.average(spaxels_flux_ma, weights=w, axis=1) * x.size
         var = np.ma.average(spaxels_stddev_ma**2, weights=w, axis=1)
-        spec[:,2] = np.ma.sqrt(var) * x.size
+        spec[:,2] = np.ma.sqrt(var * x.size)
         # STARLIGHT ignores flags >=2
         spec[:,3] = bad_lamb.astype("int") * 2
 
