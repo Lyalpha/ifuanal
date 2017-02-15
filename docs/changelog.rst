@@ -50,6 +50,9 @@ vdev
  * Added ``smooth`` parameter to :meth:`emission_line_bin` to smooth the line
    map before peak detection.
  * BPT plot is only made for bins with S/N > 3 for all relevant line fluxes.
+ * Fix bug in bin spectra uncertainty calculation.
+ * Added ``resid_sig`` argument to :meth:`run_emission_lines` to further remove
+   broad continuum residuals.
 
 v0.3.0
 ------
