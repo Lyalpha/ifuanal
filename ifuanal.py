@@ -886,7 +886,7 @@ class IFUCube(object):
         lamb_low, lamb_upp : float, optional
             The wavelength limits over which starlight will calculate the S/N.
             This isn't actually used since we have a stddev cube but the limits
-            must be within the wavelengh range of the cube anyway.
+            must be within the wavelength range of the cube anyway.
         clobber : bool, optional
             Whether to overwrite pre-existing results.
         """
@@ -1028,24 +1028,24 @@ class IFUCube(object):
         bin_num : (None, int or array_like), optional
             The bin numbers to fit (defaults to None, this will
             fit all bins where continuum fitting was sucessful)
-        vd_init : list
+        vd_init : list, optional
             The intial guess(es) for the velocity dispersion of the lines in
             km/s. If None will use initial guesses of 10, 40, 70 and 100 km/s.
-        v0_init : list or "vstar"
+        v0_init : list or "vstar", optional
             The intial guess(es) for the velocity offset of the lines in
             km/s. The special case "vstar" will use the velocty offset
             determined by STARLIGHT and construct 6 guesses over the range
             +/-200 km/s of that value, but limited to within ``offset_bounds``
             of zero offset.
-        amp_init : list
+        amp_init : list, optional
             The initial guess(es) for the amplitudes of the lines in units of
             ``fobs_norm`` (see starlight manual).
-        stddev_bounds : list
+        stddev_bounds : list, optional
             Bounding limits for the sigma widths of the lines in km/s.
-        offset_bounds : list
+        offset_bounds : list, optional
             Bounding limits for the offset of the mean of the lines in km/s.
-        weights : bool
-            Whether to include weights (1/stddev**2) in the fitting and chi2
+        weights : bool, optional
+            Whether to include weights (1/stddev) in the fitting and chi2
             determination.
         clobber : bool, optional
             Whether to overwrite pre-existing results.
@@ -1556,7 +1556,6 @@ class IFUCube(object):
             ax.set_xlim(lamb[slc.start], lamb[slc.stop])
             ax.xaxis.set_major_locator(ticker.MultipleLocator(20))
             ax.tick_params(axis="x", labelsize=10)
-        axes[0].set_ylim(ymin=np.min(emline_obs[slc]-emline_uncert[slc]))
 
         axes[0].spines["right"].set_visible(False)
         axes[-1].spines["left"].set_visible(False)
@@ -2356,7 +2355,6 @@ def fit_emission_lines(fargs):
     else:
         offset_init = 1 + np.array(np.array(v0_init)/ckms)
     stddev_init = np.asarray(np.array(vd_init)/ckms)
-
     # Make combinations of all parameter initial guesses.
     param_comb = list(product(amp_init, offset_init, stddev_init))
     Ncomb = len(param_comb)
@@ -2370,8 +2368,8 @@ def fit_emission_lines(fargs):
         amp, off, sd = comb
         for sm in el_init.submodel_names:
             elem, wl, n = sm.split("_")
-            wavelengh = el[elem][int(n)]
-            el_init[sm].parameters = [amp, wavelengh*off, wavelengh*sd]
+            wavelength = el[elem][int(n)]
+            el_init[sm].parameters = [amp, wavelength*off, wavelength*sd]
         # Create the fitter and perform the fit for this combination
         levmar_fitter = fitting.LevMarLSQFitter()
         with warnings.catch_warnings():
