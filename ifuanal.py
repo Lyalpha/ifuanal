@@ -1103,7 +1103,7 @@ class IFUCube(object):
 
         self._parse_emission(bin_num)
 
-    def _parse_emission(self, bin_num=None):
+    def _parse_emission(self, bin_num=None, cont_order=4):
         """
         Calculate useful quantities from the fitted emission line model.
 
@@ -1116,8 +1116,11 @@ class IFUCube(object):
         Parameters
         ----------
         bin_num : (None, int or array_like), optional
-            The bin numbers to get equivalent widths for (defaults to None,
-            this will fit all bins where continuum fitting was sucessful)
+            The bin numbers to get parse emission results for (defaults to
+            None, this will fit all bins where continuum fitting was sucessful)
+        cont_order : int, optional
+            The order of the polynomial to fit to the continuum model in order
+            to determine the continuum level for equivalent width measurements.
         """
 
         if bin_num is None:
@@ -1139,7 +1142,13 @@ class IFUCube(object):
                 print("skipping bin {}, no emission line results found"
                       .format(bn))
                 continue
-            # Determine fluxes, EW and FWHM for each line
+            # Make a low order polynomial of the continuum model in order
+            # to estimate the continuum level at the line locations
+            # whilst avoiding sampling deep absorption features.
+            pcoeff = np.polyfit(bin_res_c["sl_spec"][:,0],
+                                bin_res_c["sl_spec"][:,2], cont_order)
+            cont_poly = np.poly1d(pcoeff)
+            # Determine fluxes, EW, offsets, FWHM etc. for each line
             for line, fit  in emlines.items():
                 amp, mean, stddev = fit["fit_params"]
                 amp_sig, mean_sig, stddev_sig = fit["fit_uncerts"]
@@ -1148,12 +1157,11 @@ class IFUCube(object):
                 flux_uncert = ((2*math.pi) * ((stddev_sig**2 * amp**2)
                                               + (stddev**2 * amp_sig**2)))**0.5
 
-                # Find the lambda index of our line's mean and get the
-                # value of the continuum there for EW calculation
-                lamb_idx = np.abs(self.lamb - mean).argmin()
+                # Get the continuum level at the line's mean and correct
+                # for reddening and normalisation
                 cont_Alamb = get_Alamb(mean, bin_res_c["ebv_star"], self.RV)[0]
-                cont = (bin_res_c["sl_spec"][lamb_idx, 2] *
-                        bin_res_c["fobs_norm"] * 10**(0.4 * cont_Alamb))
+                cont = (cont_poly(mean) * bin_res_c["fobs_norm"]
+                        * 10**(0.4 * cont_Alamb))
                 emlines[line]["flux"] = [flux, flux_uncert]
                 emlines[line]["snr"] = flux/flux_uncert
                 emlines[line]["ew"] = [flux/cont, flux_uncert/cont]
