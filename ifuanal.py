@@ -1233,13 +1233,15 @@ class IFUCube(object):
             # Metallicity indicators and uncerts
             PP04_N2 = [8.90 + 0.57 * N2, 0.57 * N2_uncert]
             PP04_O3N2 =  [8.73 - 0.32 * O3N2, 0.32 * O3N2_uncert]
-            M13 = [8.533 - 0.214 * O3N2, 0.214 * O3N2_uncert]
+            M13_N2 = [8.743 + 0.462 * N2, 0.462 * N2_uncert]
+            M13_O3N2 = [8.533 - 0.214 * O3N2, 0.214 * O3N2_uncert]
             D16 = [8.77 + y, y_uncert]
             # Assign to dictionary
             bin_res["metallicity"] = {}
             bin_res["metallicity"]["PP04_N2"] = PP04_N2
             bin_res["metallicity"]["PP04_O3N2"] = PP04_O3N2
-            bin_res["metallicity"]["M13"] = M13
+            bin_res["metallicity"]["M13_N2"] = M13_N2
+            bin_res["metallicity"]["M13_O3N2"] = M13_O3N2
             bin_res["metallicity"]["D16"] = D16
 
     def make_emission_line_cube(self, clobber=False):
@@ -1621,13 +1623,13 @@ class IFUCube(object):
         ----------
         indicator: str
             The metallicity indicator to plot, current options are "PP04_N2",
-            "PP04_O3N2", "M13", "D16".
+            "PP04_O3N2", "M13_N2", "M13_O3N2", "D16".
         cumweight: bool, optional
             If ``True``, the contribution of each bin to the cumulative
             histogram of metallicities will be weighted by its flux in
             "Halpha_6563".
         """
-        valid_indicators = ["PP04_N2", "PP04_O3N2", "M13", "D16"]
+        valid_indicators = ["PP04_N2", "PP04_O3N2", "M13_N2", "M13_O3N2", "D16"]
         if indicator not in valid_indicators:
             raise AttributeError("`indicator` must be one of {}"
                                  .format(valid_indicators))
