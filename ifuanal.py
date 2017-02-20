@@ -1103,7 +1103,7 @@ class IFUCube(object):
 
         self._parse_emission(bin_num)
 
-    def _parse_emission(self, bin_num=None, cont_order=4):
+    def _parse_emission(self, bin_num=None, cont_order=3):
         """
         Calculate useful quantities from the fitted emission line model.
 
@@ -1142,12 +1142,7 @@ class IFUCube(object):
                 print("skipping bin {}, no emission line results found"
                       .format(bn))
                 continue
-            # Make a low order polynomial of the continuum model in order
-            # to estimate the continuum level at the line locations
-            # whilst avoiding sampling deep absorption features.
-            pcoeff = np.polyfit(bin_res_c["sl_spec"][:,0],
-                                bin_res_c["sl_spec"][:,2], cont_order)
-            cont_poly = np.poly1d(pcoeff)
+
             # Determine fluxes, EW, offsets, FWHM etc. for each line
             for line, fit  in emlines.items():
                 amp, mean, stddev = fit["fit_params"]
@@ -1157,11 +1152,21 @@ class IFUCube(object):
                 flux_uncert = ((2*math.pi) * ((stddev_sig**2 * amp**2)
                                               + (stddev**2 * amp_sig**2)))**0.5
 
-                # Get the continuum level at the line's mean and correct
-                # for reddening and normalisation
-                cont_Alamb = get_Alamb(mean, bin_res_c["ebv_star"], self.RV)[0]
-                cont = (cont_poly(mean) * bin_res_c["fobs_norm"]
-                        * 10**(0.4 * cont_Alamb))
+                # Get the continuum level with a `cont_order` polynomial
+                # fitted over a +/- 100AA window about the line and sample
+                # at the line's mean and correct for normalisation
+                low_idx = max(np.abs(self.lamb - (mean - 100)).argmin(), 0)
+                upp_idx = min(np.abs(self.lamb - (mean + 100)).argmin(),
+                              len(self.lamb))
+                # Remove pixels that were masked/clipped in continuum fitting
+                cont_px = bin_res_c["sl_spec"][low_idx:upp_idx, 3] > 0
+                cont_wl = bin_res_c["sl_spec"][low_idx:upp_idx, 0][cont_px]
+                cont_fl = bin_res_c["sl_spec"][low_idx:upp_idx, 1][cont_px]
+                pcoeff = np.polyfit(cont_wl, cont_fl, cont_order)
+                cont_poly = np.poly1d(pcoeff)
+                cont = (cont_poly(mean) * bin_res_c["fobs_norm"])
+
+                emlines[line]["cont"] = cont
                 emlines[line]["flux"] = [flux, flux_uncert]
                 emlines[line]["snr"] = flux/flux_uncert
                 emlines[line]["ew"] = [flux/cont, flux_uncert/cont]
