@@ -58,6 +58,7 @@ vdev
  * Updated continuum level determination for EW measurements of emission lines
  * Added ``cont`` entry to emission line results, giving the continuum level
    used for the EW measurement.
+ * Added new emission lines to STARLIGHT mask file.
 
 v0.3.0
 ------
