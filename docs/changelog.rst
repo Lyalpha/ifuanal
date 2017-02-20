@@ -55,6 +55,9 @@ vdev
    broad continuum residuals.
  * Added N2 indicator from Marino+13 (``M13_N2`` in results dict) and renamed
    the existing ``M13`` (O3N2) indicator to ``M13_O3N2``.
+ * Updated continuum level determination for EW measurements of emission lines
+ * Added ``cont`` entry to emission line results, giving the continuum level
+   used for the EW measurement.
 
 v0.3.0
 ------
