@@ -1204,10 +1204,10 @@ class IFUCube(object):
             # any with SNR < 3 to np.nan
             el = {}
             for line, d in emlines.items():
-                if d["snr"] < 3:
-                    el[line] = (np.nan, np.nan)
-                else:
+                if d["snr"] > 3:
                     el[line] = d["flux"]
+                else:
+                    el[line] = (np.nan, np.nan)
             # N2
             NII, NII_uncert = el["[NII]_6583"]
             Ha, Ha_uncert = el["Halpha_6563"]
