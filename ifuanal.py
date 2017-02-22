@@ -1160,6 +1160,12 @@ class IFUCube(object):
                               len(self.lamb))
                 # Remove pixels that were masked/clipped in continuum fitting
                 cont_px = bin_res_c["sl_spec"][low_idx:upp_idx, 3] > 0
+                if (np.sum(cont_px[:len(cont_px)/2]) < 10 or
+                    np.sum(cont_px[len(cont_px)/2:]) < 10):
+                    # if we don't have enough good continuum fit pixels in the
+                    # window then just take everything outside the emission
+                    # line mask
+                    cont_px = bin_res_c["sl_spec"][low_idx:upp_idx, 3] != 0
                 cont_wl = bin_res_c["sl_spec"][low_idx:upp_idx, 0][cont_px]
                 cont_fl = bin_res_c["sl_spec"][low_idx:upp_idx, 1][cont_px]
                 pcoeff = np.polyfit(cont_wl, cont_fl, cont_order)
