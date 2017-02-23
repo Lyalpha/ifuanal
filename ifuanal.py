@@ -2531,7 +2531,7 @@ def _model_to_res_dict(model, el, fobs_norm, resid_sig, resid_fn):
         # primary balmer/forbidden lines since the fitting
         # does not return uncertainties for tied parameters
         sm_uncerts = np.empty(3)
-        sm_uncerts[0] = fitted_uncerts[j] # amplitude
+        sm_uncerts[0] = fitted_uncerts[j] * fobs_norm # amplitude
         if sm in ("Halpha_6563_0", "[NII]_6548_0"):
             j += 1
             sm_uncerts[1] = fitted_uncerts[j] # mean
