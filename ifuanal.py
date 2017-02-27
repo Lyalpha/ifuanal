@@ -265,6 +265,7 @@ class IFUCube(object):
         if box_size == 0:
             self.nucleus = np.array((round(xc,3), round(yc,3)))
             print("set nucleus as {}".format(self.nucleus))
+            self.results["nucleus"] = self.nucleus
             return
         elif not box_size <= xc <= self.data_shape[2] - box_size \
              or not box_size <= yc <= self.data_shape[1] - box_size:
