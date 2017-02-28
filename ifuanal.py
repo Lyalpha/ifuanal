@@ -2355,7 +2355,7 @@ def fit_emission_lines(fargs):
         # before fitting emission line.
         gauss = Gaussian1DKernel(stddev=resid_sig)
         resid_fn = convolve(spec[:,1]-spec[:,2], gauss, boundary="extend")
-        spec[:,2] -= resid_fn
+        spec[:,2] += resid_fn
     else:
         resid_fn = 0.0
 
