@@ -1176,9 +1176,9 @@ class IFUCube(object):
                 cont = (cont_poly(mean) * bin_res_c["fobs_norm"])
 
                 emlines[line]["cont"] = cont
-                emlines[line]["flux"] = [flux, flux_uncert]
+                emlines[line]["flux"] = np.array([flux, flux_uncert])
                 emlines[line]["snr"] = flux/flux_uncert
-                emlines[line]["ew"] = [flux/cont, flux_uncert/cont]
+                emlines[line]["ew"] = np.array([flux/cont, flux_uncert/cont])
                 to_fwhm = lambda x: x * 2 * (2*math.log(2))**0.5
                 rest = emlines[line]["rest_lambda"]
                 emlines[line]["fwhm"] = [to_fwhm(stddev) * ckms / rest,
@@ -1202,8 +1202,8 @@ class IFUCube(object):
                 for line  in emlines:
                     Alamb = get_Alamb(emlines[line]["mean"][0], ebv, self.RV)[0]
                     corr = 10**(0.4 * Alamb)
-                    emlines[line]["flux"][0] *= corr
-                    emlines[line]["ew"][0] *= corr
+                    emlines[line]["flux"] *= corr
+                    emlines[line]["ew"] *= corr
             else:
                 ebv = np.nan
             bin_res["ebv_gas"] = ebv

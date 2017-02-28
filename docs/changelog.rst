@@ -61,6 +61,8 @@ vdev
  * Added new emission lines to STARLIGHT mask file.
  * Allow ``el_json`` argument to :class:`IFUCube` to now be given as a
    dictionary or json filename.
+ * Apply Balmer decrement correction to the uncertainties of flux and
+   equivalent width.
 
 v0.3.0
 ------
