@@ -1186,6 +1186,7 @@ class IFUCube(object):
                 emlines[line]["offset"] = [(mean - rest) * ckms / rest,
                                            mean_sig * ckms / rest]
                 emlines[line]["mean"] = [mean, mean_sig]
+
             # Calculate E(B-V)_gas based on balmer decrement
             # eq. 1 Kreckel et al. (1305.2923)
             if (emlines["Hbeta_4861"]["snr"] > 3 and
@@ -1210,13 +1211,17 @@ class IFUCube(object):
 
             # Determine metallicities where possible using SNR>3 lines only
             # Make a short of [flux, flux uncert] to reduce clutter and set
-            # any with SNR < 3 to np.nan
-            el = {}
+            # initially to np.nan to stop KeyError if line is not present
+            el = {"Hbeta_4861": (np.nan, np.nan),
+                  "[OIII]_5007": (np.nan, np.nan),
+                  "Halpha_6563": (np.nan, np.nan),
+                  "[NII]_6583": (np.nan, np.nan),
+                  "[SII]_6716": (np.nan, np.nan),
+                  "[SII]_6731": (np.nan, np.nan),
+            }
             for line, d in emlines.items():
                 if d["snr"] > 3:
                     el[line] = d["flux"]
-                else:
-                    el[line] = (np.nan, np.nan)
             # N2
             NII, NII_uncert = el["[NII]_6583"]
             Ha, Ha_uncert = el["Halpha_6563"]
@@ -1768,7 +1773,7 @@ class IFUCube(object):
             snr = np.array([bin_res["emission"]["lines"][line]["snr"]
                             for line in lines])
             # Do not plot for any bins without significant line detections
-            if any(snr < 3):
+            if not all(snr > 3):
                 continue
             f = [bin_res["emission"]["lines"][line]["flux"][0] for line in
                  lines]

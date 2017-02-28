@@ -63,6 +63,8 @@ vdev
    dictionary or json filename.
  * Apply Balmer decrement correction to the uncertainties of flux and
    equivalent width.
+ * Fitting a subset (or different) emission lines to the default list no longer
+   throws KeyError when calculating metallicities.
 
 v0.3.0
 ------
