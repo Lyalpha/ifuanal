@@ -1106,7 +1106,7 @@ class IFUCube(object):
 
         self._parse_emission(bin_num)
 
-    def _parse_emission(self, bin_num=None, cont_order=3):
+    def _parse_emission(self, bin_num=None, cont_order=2):
         """
         Calculate useful quantities from the fitted emission line model.
 
