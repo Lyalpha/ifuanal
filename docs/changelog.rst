@@ -59,6 +59,8 @@ vdev
  * Added ``cont`` entry to emission line results, giving the continuum level
    used for the EW measurement.
  * Added new emission lines to STARLIGHT mask file.
+ * Allow ``el_json`` argument to :class:`IFUCube` to now be given as a
+   dictionary or json filename.
 
 v0.3.0
 ------

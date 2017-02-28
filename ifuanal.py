@@ -127,6 +127,8 @@ class IFUCube(object):
             with open(os.path.join(FILEDIR, "data", "emission_lines.json")) \
                  as f:
                 self._emission_lines = json.load(f)
+        elif isinstance(el_json, dict):
+            self._emission_lines = el_json
         else:
             self._emission_lines = json.load(el_json)
 

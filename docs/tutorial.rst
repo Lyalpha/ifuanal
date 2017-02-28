@@ -26,10 +26,11 @@ type ``object?`` from within an IPython session to find out about
 * Emission lines to fit are defined in the file `data/emissionlines.json`.
   Additional lines can be fit for by copying this file and manually adding new
   entries, and giving the filepath of this new file via the ``el_json``
-  argument. **The existing entries are required by the code and should not be
-  removed or altered - they are needed for metallicity determinations**. No
-  sanity checking of the lines is done, so make sure they are sensible for the
-  data being analysed (i.e. within the wavelength window of the cube).
+  argument (alternatively a pythin ``dict`` can be passed of the same format)
+  **If the existing entries in the default line list are removed or altered
+  some plotting may fail that relies on these lines**. No sanity checking of
+  the lines is done, so make sure they are sensible for the data being analysed
+  (i.e. within the wavelength window of the cube).
 
 .. NOTE::
 
