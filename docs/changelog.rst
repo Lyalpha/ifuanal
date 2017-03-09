@@ -66,6 +66,8 @@ vdev
  * Fitting a subset (or different) emission lines to the default list no longer
    throws KeyError when calculating metallicities.
  * Added :meth:`plot_extinction`.
+ * The base_name (which determines where to save figures etc.) is now updated
+   on loading an instance via :meth:`load_pkl`
 
 v0.3.0
 ------

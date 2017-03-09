@@ -2039,6 +2039,8 @@ class IFUCube(object):
         cls.__dict__["stddev_cube"] = cube_hdu[2]
         # Let's update n_cpu incase we're loading on a different machine
         cls.n_cpu = int(min(mp.cpu_count()-1,mp.cpu_count()*0.9))
+        # Update the base_name in case we're in a different location
+        cls.base_name = os.path.splitext(os.path.abspath(pkl_file))[0]
         print("loaded pkl file {}".format(pkl_file))
         return cls
 
