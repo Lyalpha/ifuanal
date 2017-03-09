@@ -65,6 +65,7 @@ vdev
    equivalent width.
  * Fitting a subset (or different) emission lines to the default list no longer
    throws KeyError when calculating metallicities.
+ * Added :meth:`plot_extinction`.
 
 v0.3.0
 ------

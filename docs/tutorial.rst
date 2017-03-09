@@ -593,6 +593,11 @@ Classification lines are taken from Kewley et al. (2013, ApJL, 774, 10) for the
 AGN-HII division and Kewley et al. (2001, ApJ, 556, 121) for the maximal star
 burst.
 
+:meth:`~ifuanal.IFUCube.plot_extinction`
+"""""""""""""""""""""""""""""""""
+plots the extinction derived from the continuum fitting and Balmer decrement
+measure of the emission lines.
+
 .. Warning::
    :meth:`~ifuanal.IFUCube.plot_continuum` will fail if use more than
    6 metallicities are used in the STARLIGHT bases, or if the number of ages
