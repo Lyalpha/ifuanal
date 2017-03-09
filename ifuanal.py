@@ -1936,6 +1936,65 @@ class IFUCube(object):
                      bbox_inches="tight")
         print("plot saved to {}_{}.pdf".format(self.base_name, line))
 
+    def plot_extinction(self, ebv=False):
+        """
+        Plot the extinction map of the host.
+
+        The plotted values are based on the Av_min parameter found by the
+        starlight continuum fitting for the stellar extinction and via the
+        Balmer decrement for the ionised gas component. Nan values are
+        shown as white. The plot is saved with suffix `_extinction.pdf`.
+
+        Parameters
+        ----------
+        ebv: bool, optional
+            If True will plot the values as E(B-V) values, using ``RV``,
+            otherwise AV is shown
+        """
+
+        label = ("$E(B-V)_{}$" if ebv
+                 else "A$_{{V, {}}}$")
+        c = 1. if ebv else self.RV
+
+        stellar = np.full(self.data_cube.shape[1:], np.nan)
+        gas = np.full(self.data_cube.shape[1:], np.nan)
+        for bn in self._get_bin_nums("nocontbad"):
+            bin_res = self.results["bin"][bn]
+            stellar[bin_res["spax"][::-1]] = bin_res["continuum"]["ebv_star"]*c
+            gas[bin_res["spax"][::-1]] = bin_res["emission"]["ebv_gas"]*c
+
+        plt.close("all")
+        smin, smax = np.nanmin(stellar), np.nanmax(stellar)
+        if smin < 0:
+            stellarcmap = shiftedColorMap(cm.coolwarm,
+                                        midpoint=(1. - smax/(smax + abs(smin))))
+        else:
+            stellarcmap = cm.Reds
+        ax1 = plt.subplot(121, adjustable="box-forced")
+        plt.imshow(stellar, origin="lower", interpolation="none",
+                   cmap=stellarcmap)
+        plt.colorbar(label=label.format("\\star"),
+                     orientation="horizontal").ax.tick_params(labelsize=10)
+        ax1.autoscale(False)
+        plt.plot(self.nucleus[0], self.nucleus[1], "kx", markersize=10)
+
+        gmin, gmax = np.nanmin(gas), np.nanmax(gas)
+        if gmin < 0:
+            gascmap = shiftedColorMap(cm.coolwarm,
+                                      midpoint=(1. - gmax/(gmax + abs(gmin))))
+        else:
+            gascmap = cm.Reds
+        ax2 = plt.subplot(122, sharex=ax1, sharey=ax1, adjustable="box-forced")
+        plt.imshow(gas, origin="lower", interpolation="none", cmap=gascmap)
+        plt.colorbar(label=label.format("\\textrm{gas}"),
+                     orientation="horizontal").ax.tick_params(labelsize=10)
+        ax2.autoscale(False)
+        plt.plot(self.nucleus[0], self.nucleus[1], "kx", markersize=10)
+
+        plt.savefig(self.base_name+"_extinction.pdf", bbox_inches="tight")
+        print("plot saved to {}".format(self.base_name+"_extinction.pdf"))
+
+
     def plot_worst_fits(self, N=5):
         """
         Find the N bins with the worst chi2 from the starlight and emission
