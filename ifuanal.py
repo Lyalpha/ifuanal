@@ -1013,7 +1013,7 @@ class IFUCube(object):
                            v0_init=[-300,-200,-100,0,100,200,300],
                            amp_init=[0.1,1.,10.], stddev_bounds=[5.,120.],
                            offset_bounds=[-500.,500.], weights=True,
-                           resid_sig=None, clobber=False):
+                           filtwidth=None, clobber=False):
         """
         Fit emission lines in the continuum-subtracted spectra with gaussians.
 
@@ -1049,12 +1049,14 @@ class IFUCube(object):
         weights : bool, optional
             Whether to include weights (1/stddev) in the fitting and chi2
             determination.
-        resid_sig : float, optional
-            The sigma size in spectral wavelength units of a gaussian smoothing
-            kernal to use to fit the residuals after continuum subtraction.
-            Should be large enough to not fit to emission lines (>60 or so
-            but dependa on relative strength of emission lines to residuals).
-            If ``None`` (default) then this step is skipped.
+        filtwidth : float, optional
+            The size in spectral wavelength units of a median filter kernal to
+            use to fit the residuals after continuum subtraction.  Should be
+            large enough to not fit to emission lines (>50 or so).  If ``None``
+            (default) then this step is skipped. The residual function fit and
+            the median filter width as the number of spectral elements (i.e
+            filtwidth/delta_lamb) are stored in the bin results as ``resid_fn``
+            and ``filtwidth``, respectively.
         clobber : bool, optional
             Whether to overwrite pre-existing results.
         """
@@ -1078,9 +1080,9 @@ class IFUCube(object):
                     return
 
         print("fitting emission lines to {} bins...".format(len(bin_num)))
-        # convert resid_sig from angstroms to N spectral elements
-        if resid_sig:
-            resid_sig /= self.delta_lamb
+        # convert filtwidth from angstroms to N spectral elements
+        if filtwidth:
+            filtwidth /= self.delta_lamb
         # multiprocessing params for emission line fitting pool of workers
         n_cpu = min(self.n_cpu, len(bin_num))
         p = mp.Pool(n_cpu)
@@ -1094,7 +1096,7 @@ class IFUCube(object):
                                    repeat(stddev_bounds),
                                    repeat(offset_bounds),
                                    repeat(weights),
-                                   repeat(resid_sig)))
+                                   repeat(filtwidth)))
         p.close()
         p.join()
         print()
@@ -2392,7 +2394,7 @@ def fit_starlight(fargs):
 
 def fit_emission_lines(fargs):
     bin_num, bin_res, el, vd_init, v0_init, amp_init, stddev_b, off_b, \
-        w, resid_sig = fargs
+        w, filtwidth = fargs
     print("fitting bin number {:>5}".format(bin_num), end="\r")
     sys.stdout.flush()
 
@@ -2407,13 +2409,13 @@ def fit_emission_lines(fargs):
     else:
         spec[:,3] = np.ones(len(spec[:,0]))
 
-    if resid_sig:
-        # g is the sigma width of a gaussian smoothed interpolation of the
-        # model spectrum to use to improve the continuum subtraction.
-        # This residual function is subtracted from the model spectrum here
-        # before fitting emission line.
-        gauss = Gaussian1DKernel(stddev=resid_sig)
-        resid_fn = convolve(spec[:,1]-spec[:,2], gauss, boundary="extend")
+    if filtwidth:
+        # filtwidth is the width of a median filter to pass over the residual
+        # spectrum to improve the continuum subtraction.
+        # This residual function is added to the model spectrum here
+        # before fitting emission lines later.
+        resid_fn = ndimage.filters.median_filter(spec[:,1]-spec[:,2], filtwidth,
+                                                 mode="nearest")
         spec[:,2] += resid_fn
     else:
         resid_fn = 0.0
@@ -2512,7 +2514,7 @@ def fit_emission_lines(fargs):
 
     # Save all parameters for the model and uncertainties.
     res = _model_to_res_dict(best_fit, el, bin_res["continuum"]["fobs_norm"],
-                             resid_sig, resid_fn)
+                             filtwidth, resid_fn)
 
     return bin_num, res
 
@@ -2554,14 +2556,14 @@ def parse_starlight(sl_output):
     return results_dict
 
 
-def _model_to_res_dict(model, el, fobs_norm, resid_sig, resid_fn):
+def _model_to_res_dict(model, el, fobs_norm, filtwidth, resid_fn):
     """
     Given an emission line fitted model, return a dictionary of fitted
     parameters and uncertainties.
     """
     res = {}
     res["chi2dof"] = model.chi2dof
-    res["resid_sig"] = resid_sig
+    res["filtwidth"] = filtwidth
     res["resid_fn"] = resid_fn * fobs_norm
     try:
         fitted_uncerts = np.diag(model.fit_info["param_cov"])**0.5
