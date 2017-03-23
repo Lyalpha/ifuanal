@@ -431,8 +431,8 @@ somewhat brute force method is overlaid on the fitter minimisation, as
 well as applying some conditions to the fitted parameters:
 
 * The residual spectrum is constructed by subtracting the continuum fit from
-  the observed spectrum. This is then convolved with a gaussian of width
-  ``resid_sig`` if required to further remove broad residuals (see below).
+  the observed spectrum. This is then median filtered with a width of
+  ``filtwidth`` if required to further remove broad residuals (see below).
 * The residual spectrum is masked for wavelengths more than ``offset_bounds`` +
   3 :math:`\times` ``stddev_bounds`` from an emission line rest wavelength.
   Wavelengths outside these windows are not fit for.
@@ -472,12 +472,12 @@ will show the issue. For example, if the lines are well offset in velocity from
 the galaxy, relaxing ``offset_bounds`` and providing ``v0_init`` with more
 appropriate initial guesses should help the fit.
 
-In the case of broad continuum residuals that are affecting the fitting,
-these can be removed somewhat arbitrarily by using the argument ``resid_sig``.
-This sets the sigma width in wavelength units of a gaussian kernel which the
-residual emission line spectrum is convolved with. This convolved function
-is then removed from the spectrum prior to fitting. It is important to not
-fit the emission line of interest with this convolved function so ``resid_sig``
+In the case of broad continuum residuals that are affecting the fitting, these
+can be removed somewhat arbitrarily by using the argument ``filtwidth``.  This
+sets the width in wavelength units of a median filter tophat kernel, which is
+applied to the residual emission line spectrum. This median filtered function
+is then removed from the spectrum prior to fitting. It is important to not fit
+the emission line of interest with this convolved function so ``filtwidth``
 should be much larger than their widths.
 
 .. _saving-loading:

@@ -51,7 +51,7 @@ vdev
    map before peak detection.
  * BPT plot is only made for bins with S/N > 3 for all relevant line fluxes.
  * Fix bug in bin spectra uncertainty calculation.
- * Added ``resid_sig`` argument to :meth:`run_emission_lines` to further remove
+ * Added ``filtwidth`` argument to :meth:`run_emission_lines` to further remove
    broad continuum residuals.
  * Added N2 indicator from Marino+13 (``M13_N2`` in results dict) and renamed
    the existing ``M13`` (O3N2) indicator to ``M13_O3N2``.
