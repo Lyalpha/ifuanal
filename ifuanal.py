@@ -1062,7 +1062,7 @@ class IFUCube(object):
         """
         if bin_num is None:
             bin_num = self._get_bin_nums("nocontbad")
-            if bin_num == 0:
+            if len(bin_num) == 0:
                 print("found no bins with good continuum fitting")
                 return
         elif isinstance(bin_num, (int,float)):
