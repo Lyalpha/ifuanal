@@ -1251,7 +1251,7 @@ class IFUCube(object):
             S2 = np.log10(S2f)
             S2_uncert = 0.434 * (S2f_uncert/S2f)
             y =  S2 + 0.264 * N2
-            y_uncert = (S2_uncert**2 + (0.264*N2)**2)*0.5
+            y_uncert = (S2_uncert**2 + (0.264*N2_uncert)**2)**0.5
             # Metallicity indicators and uncerts
             PP04_N2 = [8.90 + 0.57 * N2, 0.57 * N2_uncert]
             PP04_O3N2 =  [8.73 - 0.32 * O3N2, 0.32 * O3N2_uncert]
