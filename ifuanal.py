@@ -1586,7 +1586,8 @@ class IFUCube(object):
         slices = np.ma.clump_unmasked(lambm)
         nax = len(slices)
         elfig, axes = plt.subplots(1, nax, sharey=True,figsize=(13,5))
-
+        if nax == 1:
+            axes = [axes]
         for slc, ax in zip(slices,axes):
             ax.plot(lamb[slc], emline_obs[slc], c=OBSCOL,lw=2)
             ax.fill_between(lamb[slc], emline_obs[slc]-emline_uncert[slc],
