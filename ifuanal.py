@@ -1003,6 +1003,7 @@ class IFUCube(object):
                     bin_res["bad"] = 1
                     continue
                 sl_results["ebv_star"] = sl_results["AV_min"]/self.RV
+                bin_res["bad"] = 0
                 bin_res.update(sl_results)
             else:
                 print("no sl_output found for bin {}".format(bn))
