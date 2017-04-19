@@ -2419,7 +2419,8 @@ def fit_emission_lines(fargs):
         # spectrum to improve the continuum subtraction.
         # This residual function is added to the model spectrum here
         # before fitting emission lines later.
-        resid_fn = ndimage.filters.median_filter(spec[:,1]-spec[:,2], filtwidth,
+        resid_fn = ndimage.filters.median_filter(spec[:,1]-spec[:,2],
+                                                 int(round(filtwidth)),
                                                  mode="nearest")
         spec[:,2] += resid_fn
     else:
