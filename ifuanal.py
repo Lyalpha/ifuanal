@@ -1772,9 +1772,9 @@ class IFUCube(object):
         # ([NII]/Ha, uncert, [OIII]/Hb, uncert, val) per row
         lineratios = np.full((len(bin_nums), 5), np.nan)
 
+        lines = ("[NII]_6583", "Halpha_6563", "[OIII]_5007", "Hbeta_4861")
         for i,bn in enumerate(bin_nums):
             bin_res = self.results["bin"][bn]
-            lines = ("[NII]_6583", "Halpha_6563", "[OIII]_5007", "Hbeta_4861")
             snr = np.array([bin_res["emission"]["lines"][line]["snr"]
                             for line in lines])
             # Do not plot for any bins without significant line detections
