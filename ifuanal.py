@@ -1289,7 +1289,7 @@ class IFUCube(object):
         emission_line_cube = np.full(self.data_cube.shape, np.nan)
         for bn in self._get_bin_nums("nocontbad"):
             bin_res = self.results["bin"][bn]
-            if bin_res["bad"] == 1:
+            if bin_res["continuum"]["bad"] == 1:
                 continue
             # subtract the synthetic spectrum from the data and account for
             # normalisation in starlight
