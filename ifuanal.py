@@ -1155,10 +1155,6 @@ class IFUCube(object):
                 amp, mean, stddev = fit["fit_params"]
                 amp_sig, mean_sig, stddev_sig = fit["fit_uncerts"]
 
-                flux = (2*math.pi)**0.5 * stddev * amp
-                flux_uncert = ((2*math.pi) * ((stddev_sig**2 * amp**2)
-                                              + (stddev**2 * amp_sig**2)))**0.5
-
                 # Get the continuum level with a `cont_order` polynomial
                 # fitted over a +/- 100AA window about the line and sample
                 # at the line's mean and correct for normalisation
@@ -1178,11 +1174,28 @@ class IFUCube(object):
                 pcoeff = np.polyfit(cont_wl, cont_fl, cont_order)
                 cont_poly = np.poly1d(pcoeff)
                 cont = (cont_poly(mean) * bin_res_c["fobs_norm"])
+                # Estimate the continuum level uncertainty as the rms of the
+                # residuals about this polynomial
+                cont_resids = cont_poly(cont_wl) - cont_fl
+                cont_uncert = (np.average(cont_resids**2)**0.5
+                               * bin_res_c["fobs_norm"])
 
-                emlines[line]["cont"] = cont
+                # Flux and EW and their uncertainty components
+                flux = (2*math.pi)**0.5 * stddev * amp
+                ew = flux/cont
+                flux_statuncert = ((2*math.pi) * ((stddev_sig**2 * amp**2)
+                                              + (stddev**2 * amp_sig**2)))**0.5
+                N = 6 * stddev
+                flux_photonuncert = (cont_uncert * N**0.5
+                                     * (1+ ew/(N * self.delta_lamb))**0.5)
+                flux_uncert = (flux_statuncert**2 + flux_photonuncert**2)**0.5
+                ew_uncert = ew * ((flux_uncert/flux)**2
+                                  + (cont_uncert/cont)**2)**0.5
+
+                emlines[line]["cont"] = [cont, cont_uncert]
                 emlines[line]["flux"] = np.array([flux, flux_uncert])
+                emlines[line]["ew"] = np.array([ew, ew_uncert])
                 emlines[line]["snr"] = flux/flux_uncert
-                emlines[line]["ew"] = np.array([flux/cont, flux_uncert/cont])
                 to_fwhm = lambda x: x * 2 * (2*math.log(2))**0.5
                 rest = emlines[line]["rest_lambda"]
                 emlines[line]["fwhm"] = [to_fwhm(stddev) * ckms / rest,
