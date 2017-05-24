@@ -21,7 +21,7 @@ import sys
 import warnings
 
 from astropy.constants import c
-from astropy.convolution import Gaussian1DKernel, convolve
+from astropy.convolution import Gaussian1DKernel, Gaussian2DKernel, convolve
 from astropy.coordinates import SkyCoord
 from astropy.io import fits
 from astropy.modeling import models, fitting
@@ -461,19 +461,20 @@ class IFUCube(object):
 
     def emission_line_bin(self, min_peak_flux, min_frac_flux, max_radius,
                           min_flux, min_npix=8, line_lamb=6562.8, border=3,
-                          smooth=1, plot=True, clobber=False, **kwargs):
+                          smooth=0.5, plot=True, clobber=False, **kwargs):
         """
         Apply the HII explorer [SFS]_ binning algorithm to the datacube.
 
         This method will bin spaxels by attempting to determine distinct
-        emission line regions. An emission line map (usually H\ :math:`\\alpha`)
-        is created by :func:`~ifuanal.get_line_map` through subtraction of a
-        continuum from a narrow band filter centred on the emission line. Peaks
-        above ``min_peak_flux`` in the emission line map are seeds for bins
-        which are expanded so long as neighbouring spaxels are above
-        ``min_frac_flux`` of the peak and within ``max_radius``
+        emission line regions. An emission line map (usually H\
+        :math:`\\alpha`) is created by :func:`~ifuanal.get_line_map` through
+        subtraction of a continuum from a narrow band filter centred on the
+        emission line. Peaks above ``min_peak_flux`` in the emission line map
+        are seeds for bins which are expanded so long as neighbouring spaxels
+        are above ``min_frac_flux`` of the peak and within ``max_radius``
         distance. Pixels below ``min_flux`` are excluded from binning. Values
-        should be passed in datacube counts.
+        should be passed in datacube counts. Islands of pixels separated from
+        their peak and bins with less than ``min_npix`` pixels are removed
 
         See :func:`~ifuanal.get_line_map` for more information on the kwargs
         used to define the wavelength windows of the line and continuum and
@@ -482,14 +483,13 @@ class IFUCube(object):
         Parameters
         ----------
         min_peak_flux : float
-            The minimum flux for a spaxel to be considered as
-            a new bin seed.
+            The minimum flux for a spaxel to be considered as a new bin seed.
         min_frac_flux : float
             The minimum flux of a spaxel, as a fraction of the bin's peak flux,
             to be considered a member of the bin.
         max_radius : float
-            The maximum radius allowed for a bin. Any peaks
-            found within ``max_radius`` of the image edge will not be used.
+            The maximum radius allowed for a bin. Any peaks found within
+            ``max_radius`` of the image edge will not be used.
         min_flux : float
             The minimum flux of a spaxel for consideration in the binning
             routine.
@@ -546,7 +546,8 @@ class IFUCube(object):
 
         # Find peaks in the line_map, these can be quite close together
         # as we will grow/merge them later with the HII explorer algorithm
-        smooth_line_map = ndimage.filters.gaussian_filter(line_map, smooth)
+        gauss = Gaussian2DKernel(stddev=smooth)
+        smooth_line_map = convolve(line_map, gauss, boundary="extend")
         line_map_max = ndimage.maximum_filter(smooth_line_map, size=3,
                                               mode="constant")
         # Get the location of the peaks and apply the minimum peak threshhold
