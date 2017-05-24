@@ -635,19 +635,19 @@ class IFUCube(object):
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore", UserWarning)
                 ax[0].imshow(filt_map, origin="lower",
-                             interpolation="none", norm=colors.PowerNorm(0.5))
+                             interpolation="none", norm=colors.PowerNorm(0.25))
                 ax[0].set_title("Filter")
                 ax[0].autoscale(False)
                 ax[1].imshow(cont_map, origin="lower",
-                             interpolation="none", norm=colors.PowerNorm(0.5))
+                             interpolation="none", norm=colors.PowerNorm(0.25))
                 ax[1].set_title("Continuum")
                 ax[1].autoscale(False)
                 ax[2].imshow(line_map, origin="lower",
-                             interpolation="none", norm=colors.PowerNorm(0.5))
+                             interpolation="none", norm=colors.PowerNorm(0.25))
                 ax[2].set_title("Line")
                 ax[2].autoscale(False)
                 ax[3].imshow(bin_map, origin="lower", interpolation="none",
-                             cmap="viridis_r", norm=colors.PowerNorm(0.5))
+                             cmap="viridis_r", norm=colors.PowerNorm(0.25))
                 ax[3].autoscale(False)
             ax[2].scatter(peak_xy[:,1], peak_xy[:,0], s=9, marker="x",
                           c="w", alpha=0.5, lw=0.3)
