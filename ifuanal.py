@@ -546,8 +546,11 @@ class IFUCube(object):
 
         # Find peaks in the line_map, these can be quite close together
         # as we will grow/merge them later with the HII explorer algorithm
-        gauss = Gaussian2DKernel(stddev=smooth)
-        smooth_line_map = convolve(line_map, gauss, boundary="extend")
+        if smooth > 0:
+            gauss = Gaussian2DKernel(stddev=smooth)
+            smooth_line_map = convolve(line_map, gauss, boundary="extend")
+        else:
+            smooth_line_map = line_map
         line_map_max = ndimage.maximum_filter(smooth_line_map, size=3,
                                               mode="constant")
         # Get the location of the peaks and apply the minimum peak threshhold
