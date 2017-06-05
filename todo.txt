@@ -28,7 +28,3 @@
 
 #TODO:     create data/metallicity_indicators.json for custom indicators to be
 #          used/added
-
-#TODO:     allow a low order polynomial/spline or linear continuum to be sub-
-#          tracted from the spectra after stellar continuum fitting and prior
-#          to emission line fitting?
