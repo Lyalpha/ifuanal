@@ -21,6 +21,7 @@ import sys
 import warnings
 
 from astropy.constants import c
+from astropy.convolution import convolve, Gaussian2DKernel
 from astropy.coordinates import SkyCoord
 from astropy.io import fits
 from astropy.modeling import models, fitting
@@ -31,6 +32,7 @@ from matplotlib import gridspec, ticker, cm, colors, rc
 import numpy as np
 from scipy.interpolate import interp1d
 from scipy import ndimage
+from scipy.spatial.distance import cdist
 
 from voronoi import voronoi
 import dill as pickle
@@ -460,7 +462,7 @@ class IFUCube(object):
 
     def emission_line_bin(self, min_peak_flux, min_frac_flux, max_radius,
                           min_flux, min_npix=8, line_lamb=6562.8, border=3,
-                          smooth=1, plot=True, clobber=False, **kwargs):
+                          smooth=0.5, plot=True, clobber=False, **kwargs):
         """
         Apply the HII explorer [SFS]_ binning algorithm to the datacube.
 
@@ -472,7 +474,8 @@ class IFUCube(object):
         are seeds for bins which are expanded so long as neighbouring spaxels
         are above ``min_frac_flux`` of the peak and within ``max_radius``
         distance. Pixels below ``min_flux`` are excluded from binning. Values
-        should be passed in datacube counts.
+        should be passed in datacube counts. Islands of pixels separated from
+        their peak and bins with less than ``min_npix`` pixels are removed
 
         See :func:`~ifuanal.get_line_map` for more information on the kwargs
         used to define the wavelength windows of the line and continuum and
@@ -481,14 +484,13 @@ class IFUCube(object):
         Parameters
         ----------
         min_peak_flux : float
-            The minimum flux for a spaxel to be considered as
-            a new bin seed.
+            The minimum flux for a spaxel to be considered as a new bin seed.
         min_frac_flux : float
             The minimum flux of a spaxel, as a fraction of the bin's peak flux,
             to be considered a member of the bin.
         max_radius : float
-            The maximum radius allowed for a bin. Any peaks
-            found within ``max_radius`` of the image edge will not be used.
+            The maximum radius allowed for a bin. Any peaks found within
+            ``max_radius`` of the image edge will not be used.
         min_flux : float
             The minimum flux of a spaxel for consideration in the binning
             routine.
@@ -546,7 +548,12 @@ class IFUCube(object):
 
         # Find peaks in the line_map, these can be quite close together
         # as we will grow/merge them later with the HII explorer algorithm
-        smooth_line_map = ndimage.filters.gaussian_filter(line_map, smooth)
+        if smooth > 0:
+            gauss = Gaussian2DKernel(stddev=smooth)
+            smooth_line_map = convolve(line_map, gauss,
+                                       boundary="extend")
+        else:
+            smooth_line_map = line_map
         line_map_max = ndimage.maximum_filter(smooth_line_map, size=3,
                                               mode="constant")
         # Get the location of the peaks and apply the minimum peak threshhold
@@ -634,25 +641,268 @@ class IFUCube(object):
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore", UserWarning)
                 ax[0].imshow(filt_map, origin="lower",
-                             interpolation="none", norm=colors.PowerNorm(0.5))
+                             interpolation="none", norm=colors.PowerNorm(0.25))
                 ax[0].set_title("Filter")
                 ax[0].autoscale(False)
                 ax[1].imshow(cont_map, origin="lower",
-                             interpolation="none", norm=colors.PowerNorm(0.5))
+                             interpolation="none", norm=colors.PowerNorm(0.25))
                 ax[1].set_title("Continuum")
                 ax[1].autoscale(False)
                 ax[2].imshow(line_map, origin="lower",
-                             interpolation="none", norm=colors.PowerNorm(0.5))
+                             interpolation="none", norm=colors.PowerNorm(0.25))
                 ax[2].set_title("Line")
                 ax[2].autoscale(False)
                 ax[3].imshow(bin_map, origin="lower", interpolation="none",
-                             cmap="viridis_r", norm=colors.PowerNorm(0.5))
+                             cmap="viridis_r", norm=colors.PowerNorm(0.25))
                 ax[3].autoscale(False)
             ax[2].scatter(peak_xy[:, 1], peak_xy[:, 0], s=9, marker="x",
                           c="w", alpha=0.5, lw=0.3)
             ax[3].set_title("Bins")
             binfig.suptitle("Filter centre at {}\\AA".format(line_lamb))
             binfig.savefig(self.base_name+"_bins_el.pdf", bbox_inches="tight")
+
+        self.results["bin"] = bin_nums
+        print()
+        print("found {} bins".format(len(bin_nums)))
+
+    def nearest_bin(self, min_peak_flux, max_radius, min_flux, min_npix=8,
+                    line_lamb=6562.8, weighted=True, weight_pow=1/3., niter=1,
+                    max_filter_size=5, border=3, smooth=0.5, plot=True,
+                    clobber=False, **kwargs):
+        """
+        Create bins based on pixels proximity to peaks, largely derived from
+        [LRN]_.
+
+        An emission line map (usually H\ :math:`\\alpha`) is created by
+        :func:`~ifuanal.get_line_map` through subtraction of a continuum from a
+        narrow band filter centred on the emission line. Peaks above
+        ``min_peak_flux`` in the emission line map are seeds for bins. Any peak
+        within ``n_iter`` pixels of a pixel with value less than ``min_flux``
+        or a masked (nan) pixel are rejected.  The closest peak to each pixel
+        is determined forming the basis of the bins. Those pixels further than
+        ``max_radius`` from a peak or below ``min_flux`` are then
+        removed. Islands of pixels separated from the bin underlying their
+        nearest peak, and bins with less than ``min_npix`` pixels are removed.
+
+        The optional argument ``weighted`` will apply a weighting to the
+        distances of each peak based on the sum of the flux in each unweighted
+        bin to the power ``weight_pow``. This means that brighter regions have
+        more influence over local pixels than nearby faint peaks. The
+        ``max_radius`` argument will still be adhered to.
+
+        See :func:`~ifuanal.get_line_map` for more information on the kwargs
+        used to define the wavelength windows of the line and continuum and
+        their defaults.
+
+        Parameters
+        ----------
+        min_peak_flux : float
+            The minimum flux for a spaxel to be considered as a new bin seed.
+        max_radius : float
+            The maximum radius allowed for a pixel to be considered part of a
+            bin.
+        min_flux : float
+            The minimum flux of a spaxel for consideration in the binning
+            routine.
+        min_npix : float, optional
+            The minimum number of pixels required for a bin.
+        line_lamb : float, optional
+            The wavelength of emission line to use (defaults to
+            H\ :math:`\\alpha`).
+        weighted : bool, optional
+            Whether to weight the distance determination based on the fluxes
+            around each peak.
+        weight_pow : float, optional
+            The power index used in the weighting of distances, requires
+            ``weighted = True``
+        n_iter : int, optional
+            Peaks within this number of pixels of a masked (nan) or <
+            ``min_flux`` pixel will be removed. This can help eliminate noise
+            spikes as bin seeds.
+        max_filter_size : int, optional
+            The square footprint in pixels from which to determine peaks.
+            See ``scipy.ndimage.filters.maximum_filter`` documentation.
+        border : int, optional
+            The size of a border in pixels around all nans and the cube edges
+            to exclude peaks from. i.e. and peak found within ``border`` of the
+            edge of field of view or a masked region will not be used as a bin
+            seed.
+        smooth : float, optional
+            The width of the gaussian filter to use when smoothing the emission
+            line map, prior to peak detection, set to zero to skip smoothing.
+        plot : bool, optional
+            Whether to make a plot of the continuum, filter, line and bin maps.
+        clobber : bool, optional
+            Whether to overwrite any existing binning results.
+        filter_width : float, optional
+            The filter width to extract around the emission line.
+        cont_width : float, optional
+            The width of the wavelength window to extract either side of the
+            filter to define the continuum.
+        cont_pad : float, optional
+            The padding to apply between the edge of the filter and the start
+            of continuum window.
+
+        References
+        ----------
+        .. [LRN] Rousseau-Nepton et al., `NGC628 with SITELLE : I. Imaging
+           Spectroscopy of 4285 HII region candidates`, arXiv:1704.05121
+        """
+        try:
+            self.results["bin"]
+        except KeyError:
+            pass
+        else:
+            if not clobber:
+                print("bins already exist, use clobber=True to overwrite")
+                return
+
+        if min_flux >= min_peak_flux:
+            print("min_peak_flux > min_flux is required")
+            return
+
+        print("binning spaxels using Nearest pixel algorithm around emission "
+              "line {}".format(line_lamb))
+
+        print("finding peaks")
+        # Get emission line map
+        maps = get_line_map(self.data_cube, self.lamb, line_lamb, **kwargs)
+        filt_map, cont_map, line_map = maps
+        # Gaussian smooth if needed
+        if smooth > 0:
+            gauss = Gaussian2DKernel(stddev=smooth)
+            smooth_line_map = convolve(line_map, gauss,
+                                       boundary="extend")
+        else:
+            smooth_line_map = line_map
+        # Find peaks in the line_map
+        line_map_max = ndimage.maximum_filter(smooth_line_map,
+                                              size=max_filter_size,
+                                              mode="constant")
+        # Get the location of the peaks and apply the minimum peak threshhold
+        peaks = ((line_map_max == smooth_line_map)
+                 & (line_map >= min_peak_flux))
+        # Remove all peaks within ``border`` of the cube edge
+        peaks[:border, :] = 0
+        peaks[-border:, :] = 0
+        peaks[:, :border] = 0
+        peaks[:, -border:] = 0
+        # Remove peaks within n_iter of a pixel < min_flux
+        struct = ndimage.generate_binary_structure(2, 1)
+        toofaint = ndimage.binary_dilation(line_map < min_flux,
+                                           structure=struct,
+                                           iterations=niter)
+        peaks[toofaint] = False
+        sort_idx = line_map[peaks].argsort()[::-1]  # sort descending in flux
+        peak_xy = np.argwhere(peaks)[sort_idx]
+        n_peaks = len(peak_xy)
+        if n_peaks == 0:
+            print("no peaks found!")
+            return
+
+        print("calculating pixel distances")
+        # Distances between pixels and all peaks
+        yl, xl = line_map.shape
+        x = np.arange(xl)
+        y = np.arange(yl)
+        yy, xx = np.meshgrid(x, y)
+        px_cen = np.column_stack((xx.ravel(), yy.ravel()))
+        cdres = cdist(px_cen, peak_xy)
+        # Get nearest peaks for each pixel
+        nearest = np.argmin(cdres, axis=1)
+        # We use zero to mark rejected pixels so the first bin needs to be 1
+        near_map = nearest.reshape(line_map.shape).astype(float) + 1
+        # Remove nans and <min_flux in original image
+        near_map[line_map < min_flux] = 0
+        near_map[np.isnan(line_map)] = 0
+        # Remove pixels more than max_radius away from any peak
+        nearestdist = np.min(cdres, axis=1)
+        toofar = (nearestdist > max_radius).reshape(line_map.shape)
+        near_map[toofar] = 0
+        # Remove pixels not connected to any peak
+        labeled_nearmap, nlabels = ndimage.label(near_map)
+        good_labels = np.unique(labeled_nearmap[peaks])
+        goodlabeled_nearmap = (np.in1d(labeled_nearmap, good_labels)
+                               .reshape(labeled_nearmap.shape))
+        near_map[~goodlabeled_nearmap] = 0
+        # Perform grey closing to remove pixel 'holes' in the bins
+        near_map = ndimage.morphology.grey_closing(near_map, size=(3, 3))
+        # Mask nans and still abide by distance
+        near_map[np.isnan(line_map) | toofar] = 0
+
+        # Weight distances to reform bins if needed
+        if weighted:
+            print("weighting distances")
+            # Calculate fluxes from un-weighted bins
+            fluxes = ndimage.sum(line_map, near_map, range(1, n_peaks+1))
+            # Recalculate distances, weighting by flux**weight_pow
+            cdresw = cdres / fluxes[np.newaxis, :]**weight_pow
+            # Add upper limit as max_radius to stop regions 'bleeding'
+            dist_mask = cdres > max_radius
+            cdresw[dist_mask] = np.inf
+            nearestw = np.argmin(cdresw, axis=1)
+            near_mapw = nearestw.reshape(line_map.shape).astype(float) + 1
+            near_mapw[near_map == 0] = 0  # apply all bin rejection as above
+            near_map = near_mapw
+        # Remove pixels not connected to *their* peak
+        for i in range(1, len(peak_xy)+1):
+            _nrmap = np.copy(near_map)
+            _nrmap[_nrmap != i] = 0
+            _lblmap, _nlbl = ndimage.label(_nrmap)
+            _goodlbl = np.unique(_lblmap[peaks])
+            _goodlblmap = np.in1d(_lblmap, _goodlbl).reshape(_nrmap.shape)
+            near_map[(~_goodlblmap) & (_nrmap > 0)] = 0
+        # Change back to zero-index labels and nans for bad pixels
+        near_map[near_map == 0] = np.nan
+        near_map -= 1
+
+        # Fill bin_nums dict for storage in results dict
+        bin_nums = {}
+        for bn, xy in enumerate(peak_xy):
+            x, y = map(int, xy)
+            print("processing bin {}/{}".format(bn+1, n_peaks), end="\r")
+            sys.stdout.flush()
+            xy_spax = np.where(near_map == bn)[::-1]
+            xy_mean = (x, y)[::-1]
+            nx, ny = self.nucleus - 0.5
+            distances = ((xy_spax[0] - nx)**2
+                         + (xy_spax[1] - ny)**2)**0.5
+            bin_nums[bn] = {"spax": xy_spax,
+                            "mean": xy_mean,
+                            "spec":self._get_bin_spectrum(xy_spax),
+                            "dist_min": np.min(distances),
+                            "dist_max": np.max(distances),
+                            "dist_mean": ((xy_mean[0] - nx)**2
+                                          + (xy_mean[1] - ny)**2)**0.5,
+                            "continuum": {"bad": 0},
+                            "emission": {"bad": 0}}
+        if plot:
+            plt.close()
+            binfig, ax = plt.subplots(1, 4, sharex=True, sharey=True,
+                                      figsize=(16, 4),
+                                      subplot_kw={"adjustable": "box-forced"})
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", UserWarning)
+                ax[0].imshow(filt_map, origin="lower",
+                             interpolation="none", norm=colors.PowerNorm(0.25))
+                ax[0].set_title("Filter")
+                ax[0].autoscale(False)
+                ax[1].imshow(cont_map, origin="lower",
+                             interpolation="none", norm=colors.PowerNorm(0.25))
+                ax[1].set_title("Continuum")
+                ax[1].autoscale(False)
+                ax[2].imshow(line_map, origin="lower",
+                             interpolation="none", norm=colors.PowerNorm(0.25))
+                ax[2].set_title("Line")
+                ax[2].autoscale(False)
+                ax[3].imshow(near_map, origin="lower", interpolation="none",
+                             cmap="viridis_r", norm=colors.PowerNorm(0.25))
+                ax[3].autoscale(False)
+            ax[2].scatter(peak_xy[:, 1], peak_xy[:, 0], s=9, marker="x",
+                          c="w", alpha=0.5, lw=0.3)
+            ax[3].set_title("Bins")
+            binfig.suptitle("Filter centre at {}\\AA".format(line_lamb))
+            binfig.savefig(self.base_name+"_bins_nr.pdf", bbox_inches="tight")
 
         self.results["bin"] = bin_nums
         print()
