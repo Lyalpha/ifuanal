@@ -152,7 +152,7 @@ class IFUCube(object):
         if ebv == 0:
             print("ebv = 0, skipping deredden()")
             return
-        print("dereddening with E(B-V) = {:.3f}mag and RV = {}"
+        print("dereddening with E(B-V) = {:.3f} mag and RV = {}"
               .format(ebv, self.RV))
         Alamb = get_Alamb(self.lamb, ebv, self.RV, self.lamb_unit)[0]
         corr = 10**(0.4 * Alamb)
@@ -245,9 +245,10 @@ class IFUCube(object):
             Best guess for sigma of gaussian in pixels.
         box_size : int, optional
             The half-length of the box, centred on ``xc``, ``yc``, to fit with
-            a gaussian in pixels. If 0 then will for nucleus as ``xc``, ``yc``.
+            a 2D gaussian in pixels. If 0 then set nucleus directly as ``xc``,
+            ``yc``.
         lamb_low, lamb_upp : float, optional
-            The wavelength limits over which to sum.
+            The wavelength limits over which to sum the cube.
         plot : bool, optional
             Make a plot of the data, model and residual).
         """
