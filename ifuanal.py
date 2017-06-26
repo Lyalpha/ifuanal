@@ -1111,7 +1111,7 @@ class IFUCube(object):
 
         self._parse_emission(bin_num)
 
-    def _parse_emission(self, bin_num=None, cont_order=2):
+    def _parse_emission(self, bin_num=None, cont_order=2, snrlimit=3):
         """
         Calculate useful quantities from the fitted emission line model.
 
@@ -1129,6 +1129,9 @@ class IFUCube(object):
         cont_order : int, optional
             The order of the polynomial to fit to the continuum model in order
             to determine the continuum level for equivalent width measurements.
+        snrlimit: float, optional
+            Metallicity values will only be calculated where all dependant
+            lines are detected at a SNR above this value.
         """
 
         if bin_num is None:
@@ -1238,7 +1241,7 @@ class IFUCube(object):
                   "[SII]_6731": (np.nan, np.nan),
             }
             for line, d in emlines.items():
-                if d["snr"] > 3:
+                if d["snr"] > snrlimit:
                     el[line] = d["flux"]
             # N2
             NII, NII_uncert = el["[NII]_6583"]
