@@ -1854,7 +1854,7 @@ class IFUCube(object):
         vfig.savefig(self.base_name+"_bpt.pdf", bbox_inches="tight")
         print("plot saved to {}_bpt.pdf".format(self.base_name))
 
-    def plot_line_map(self, line):
+    def plot_line_map(self, line, snrlimit=3):
         """
         Plot maps of emission line parameters.
 
@@ -1869,6 +1869,9 @@ class IFUCube(object):
             wavelength of the line as per the data in the emission lines json
             data given to :class:`~ifuanal.IFUCube`. Set as "?" to see a list
             available.
+        snrlimit: float, optional
+            Only bins where the line was detected above this value will be
+            plotted.
         """
         for bn in self._get_bin_nums("nobad"):
             try:
@@ -1895,8 +1898,8 @@ class IFUCube(object):
 
         for i,bn in enumerate(bin_nums):
             bin_res = self.results["bin"][bn]
-            # Only consider those bins with SNR > 3
-            if bin_res["emission"]["lines"][line]["snr"] < 3:
+            # Only consider those bins with SNR above our limit
+            if bin_res["emission"]["lines"][line]["snr"] < snrlimit:
                 continue
             for j,prop in enumerate(("ew", "flux", "offset", "fwhm")):
                 val, val_uncert = bin_res["emission"]["lines"][line][prop]
