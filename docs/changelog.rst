@@ -1,8 +1,8 @@
 Changelog
 =========
 
-vdev
-----
+v0.4.0
+------
  * :attr:`results` dict has been reimplemented with a new structure and now
    supercedes :attr:`bin_nums`.
 
@@ -14,6 +14,8 @@ vdev
    :meth:`~ifuanal.IFUCube._parse_continuum` and
    :meth:`~ifuanal.IFUCube._parse_emission`. They are automatically called
    after fitting so do not need to be explicitly called usually.
+ * Added :meth:`~ifuanal.IFUCube.nearest_bin` as a new binning method combining
+   emission line and voronoi binning.
  * The Balmer decrement is calculated when parsing the emission line model and
    an estimate of E(B-V)_gas is made to deredden the fluxes of the emission
    lines.
@@ -67,7 +69,9 @@ vdev
    throws KeyError when calculating metallicities.
  * Added :meth:`plot_extinction`.
  * The base_name (which determines where to save figures etc.) is now updated
-   on loading an instance via :meth:`load_pkl`
+   on loading an instance via :meth:`load_pkl`.
+ * ``snrlimit`` argument available for :meth:`~ifuanal.IFUCube._parse_emission`
+   and :meth:`~ifuanal.IFUCube.line_map`.
 
 v0.3.0
 ------
