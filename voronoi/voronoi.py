@@ -43,7 +43,7 @@ EXPLANATION:
 CALLING SEQUENCE:
 
     binNum, xBin, yBin, xBar, yBar, sn, nPixels, scale = voronoi_2d_binning(
-                x, y, signal, noise, targetSN, plot=True, quiet=False, 
+                x, y, signal, noise, targetSN, plot=True, quiet=False,
                 wvt=False, cvt=True, pixelsize=None)
 
     The function _sn_func() below returns the S/N of a bin and it can be
@@ -404,7 +404,7 @@ def _reassign_bad_bins(classe, x, y, quiet):
                 print("{:6}/{}".format(i, badSize), end="\r")
                 sys.stdout.flush()
             index[i] = np.argmin((x[badIndex] - xnode)**2 + (y[badIndex] - ynode)**2)
-    else:        
+    else:
          index = np.argmin((x[bad, None] - xnode)**2 + (y[bad, None] - ynode)**2, axis=1)
     classe[bad] = good[index]
 
@@ -459,7 +459,7 @@ def _cvt_equal_mass(x, y, signal, noise, xnode, ynode, quiet, wvt, n_cpu):
                                                    repeat(scale))))
             p.close()
             p.join()
-        else: 
+        else:
             classe = np.argmin(((x[:, None] - xnode)**2 + (y[:, None] - ynode)**2)/scale**2, axis=1)
 
         # Computes centroids of the bins, weighted by dens**2.
@@ -498,7 +498,7 @@ def _cvt_equal_mass(x, y, signal, noise, xnode, ynode, quiet, wvt, n_cpu):
                                                    repeat(scale))))
             p.close()
             p.join()
-        else: 
+        else:
             classe = np.argmin(((x[:, None] - xnode)**2 + (y[:, None] - ynode)**2)/scale**2, axis=1)
 
 
@@ -563,8 +563,8 @@ def _display_pixels(x, y, counts, pixelSize):
     """
     xmin, xmax = np.min(x), np.max(x)
     ymin, ymax = np.min(y), np.max(y)
-    nx = round((xmax - xmin)/pixelSize) + 1
-    ny = round((ymax - ymin)/pixelSize) + 1
+    nx = int(round((xmax - xmin)/pixelSize) + 1)
+    ny = int(round((ymax - ymin)/pixelSize) + 1)
     img = np.full((nx, ny), np.nan)  # use nan for missing data
     j = np.round((x - xmin)/pixelSize).astype(int)
     k = np.round((y - ymin)/pixelSize).astype(int)
