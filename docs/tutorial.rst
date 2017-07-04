@@ -280,12 +280,12 @@ nearest (after flux weighting) HII region. ::
     found [n] bins
 
 A description of these required arguments and all optional ones is available at
-:meth:`~ifuanal.IFUCube.nearest_line_bin`. The initial seeds for bins are found
+:meth:`~ifuanal.IFUCube.nearest_bin`. The initial seeds for bins are found
 as peaks in a smoothed emission line image, similar to
 :ref:`hii-binning`. Then, additionally:
 
 1. The nearest peak for each pixel is found. Creating a voronoi map (see also
-   :ref:`vor-binning`.
+   :ref:`vor-binning`).
 
 2. Each bin is created from a peak to include pixels that:
    * Have that peak as its nearest.
