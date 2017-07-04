@@ -869,7 +869,7 @@ class IFUCube(object):
                          + (xy_spax[1] - ny)**2)**0.5
             bin_nums[bn] = {"spax": xy_spax,
                             "mean": xy_mean,
-                            "spec":self._get_bin_spectrum(xy_spax),
+                            "spec": self._get_bin_spectrum(xy_spax),
                             "dist_min": np.min(distances),
                             "dist_max": np.max(distances),
                             "dist_mean": ((xy_mean[0] - nx)**2
