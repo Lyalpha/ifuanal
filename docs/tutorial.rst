@@ -178,12 +178,11 @@ Binning the spaxels
 
 We do not want to consider sky spaxels in our analysis and, additionally, we do
 not want to perform fitting to low signal-to-noise ratio (SNR) spaxels. To
-circumvent this we employ spaxel binning.
+circumvent this we employ spaxel binning in order to group areas of physically related spaxels.
 
 The spaxels are to be binned into distinct regions in order to increase the S/N
-of the composite region spectra for fitting. :ref:`hii-binning` and
-:ref:`vor-binning` are the two currently implemented methods, with the ability
-to also :ref:`add custom bins <custom-bins>`.
+of the composite region spectra for fitting. :ref:`hii-binning`, :ref:`near-binning` and :ref:`vor-binning` are currently implemented methods, with the ability
+to also :ref:`add custom bins <custom-bins>`. For observations of starforming galaxies, the :ref:`near-binning` is the preferred method to bin into distinct star formation regions of the galaxy.
 
 These binning routines will populate :ref:`results-dict` with each bin. The
 information is stored as follows for bin number ``bn``: ::
@@ -231,7 +230,8 @@ implementation, to grow bins around peaks in the emission line flux. ::
 
 A description of these required arguments is available in the documentation for
 :meth:`~ifuanal.IFUCube.emission_line_bin`. These will have to be tailored to
-each data cube. Although usually (and by default) the binning will be done for
+each data cube. ``min_peak_flux`` and ``min_flux`` are best determined by looking at the median and std dev of a blank region of the cube in a narrowband image centred on the emission line for which binning is being done (for example ``min_peak_flux = 8 * stddev`` and ``min_flux = 3*stddev`` are reasonable start points).
+Although usually (and by default) the binning will be done for
 the H\ :math:`\alpha` line, any line or wavelength can be chosen via the
 ``line_lamb`` argument.
 
@@ -261,6 +261,44 @@ close since the subsequent growth of the bins will merge nearby peaks.
 The resulting bins are then saved in ``cube.results["bin"]``. By default a
 plot of the emission line map creation and the bins will be produced and saved
 as `_bins_el.pdf`.
+
+.. _near-binning:
+
+Nearest HII binning
+^^^^^^^^^^^^^^^^^^^
+
+The nearest HII binning method is a slight variation to the :ref:`hii-binning`
+algorithm, with additional checks to ensure spaxels are assigned to their
+nearest (after flux weighting) HII region. ::
+
+    >>> cube.nearest_bin(min_peak_flux=1100, max_radius=5, min_flux=600)
+    binning spaxels using Nearest pixel algorithm around emission line 6562.8
+    finding peaks
+    calculating pixel distances
+    weighting distances
+    processing bin [i]/[m]
+    found [n] bins
+
+A description of these required arguments and all optional ones is available at
+:meth:`~ifuanal.IFUCube.nearest_line_bin`. The initial seeds for bins are found
+as peaks in a smoothed emission line image, similar to
+:ref:`hii-binning`. Then, additionally:
+
+1. The nearest peak for each pixel is found. Creating a voronoi map (see also
+   :ref:`vor-binning`.
+
+2. Each bin is created from a peak to include pixels that:
+   * Have that peak as its nearest.
+   * Are within the ``max_radius`` of the peak
+   * Are above the ``min_flux`` level.
+
+3. The fluxes of these initial bins are calculated as an initial guess to
+   weight the distance calculations. The distances to each peak are now
+   calculated as original distance divided by that peak's initial bin flux to
+   the power ``weight_pow``. This means brighter emission regions have more
+   influence over their surroundings than fainter regions, as expected.
+
+The weighting of the distances can be turned off with ``weighted=False``.
 
 .. _vor-binning:
 
@@ -594,7 +632,7 @@ AGN-HII division and Kewley et al. (2001, ApJ, 556, 121) for the maximal star
 burst.
 
 :meth:`~ifuanal.IFUCube.plot_extinction`
-"""""""""""""""""""""""""""""""""
+""""""""""""""""""""""""""""""""""""""""
 plots the extinction derived from the continuum fitting and Balmer decrement
 measure of the emission lines.
 
