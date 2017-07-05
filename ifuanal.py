@@ -201,14 +201,14 @@ class IFUCube(object):
         ----------
         centres : list of lists
             Coordinates of mask centres of the form ((x1,y1),...(xn,yn)).
-            Should be given as zero-indexed values.
-        r : int or array_like
+            Should be given as zero-indexed integer values.
+        r : float or array_like
             The radius (radii) of the masks. If given as ``int``, same radius
             used for all masks given in ``centres``. If ``array_like``, this
             will be cycled over for all ``centres``.
         """
         print("masking regions")
-        if isinstance(r, int):
+        if isinstance(r, (int, float)):
             r = [r]
         elif len(r) != len(centres) and len(r) != 1:
             warnings.warn("Number of radii ({}} not same as centres ({}). "
