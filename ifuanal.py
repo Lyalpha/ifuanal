@@ -6,7 +6,7 @@ For the analysis of IFU data cubes.
 
 from __future__ import print_function
 
-__version__ = "0.4.0"
+__version__ = "0.4.dev"
 __author__ = "J. Lyman"
 
 from itertools import repeat, cycle, product
@@ -84,9 +84,11 @@ class IFUCube(object):
     sl_dir : None or str, optional
         The directory containing starlight files and bases. The default
         ``None`` will use the `starlight/` subdirectory.
-    el_json : None or str, optional
-        The filepath of the emission lines json file. If None will use the
-        default located in `data/emission_lines.json`
+    el_json : None dict or str, optional
+        Either a dictonary of emission lines to fit or the filepath to an
+        emission lines json file. If ``None`` will use the default located in
+        `data/emission_lines.json`. Follow the format of this default to create
+        custom line lists.
     """
     def __init__(self, cube_hdu, base_name, RV=3.1, sl_dir=None, el_json=None):
 
@@ -2409,8 +2411,10 @@ class MUSECube(IFUCube):
         The directory containing starlight files and bases. The default
         ``None`` will use the `starlight/` subdirectory.
     el_json : None or str, optional
-        The filepath of the emission lines json file. If None will use the
-        default located in `data/emission_lines.json`
+        Either a dictonary of emission lines to fit or the filepath to an
+        emission lines json file. If ``None`` will use the default located in
+        `data/emission_lines.json`. Follow the format of this default to create
+        custom line lists.
 
     References
     ----------
