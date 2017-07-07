@@ -1118,15 +1118,14 @@ class IFUCube(object):
         return spec
 
     def run_starlight(self, bin_num=None, base_name="bc03", lamb_low=5590.,
-                      lamb_upp=5680., clobber=False):
+                      lamb_upp=5680., tmp_dir=None, clobber=False):
         """
         Run the starlight fitting of spectra in the cube.
 
-        This method will create a file with the suffix `_sloutputs.txt` which
-        gives the bin numbers and their corresponding starlight output files.
-        If a run has been previously performed, the contents of this file can
-        be read - however the files containing the starlight output must
-        also exist.
+        Creates a unique directory with prefix `sl_` in which to store
+        starlight output. By default this is in the system's `$TMP`, but can be
+        manually set with ``tmp_dir``. starlight doe not like long file paths:
+        ensure the directory file path is short (<40 chars or so).
 
         Parameters
         ----------
@@ -1141,6 +1140,9 @@ class IFUCube(object):
             The wavelength limits over which starlight will calculate the S/N.
             This isn't actually used since we have a stddev cube but the limits
             must be within the wavelength range of the cube anyway.
+        tmp_dir : str, optional
+            The directory in which to store the starlight output. A unique
+            directory with prefix `sl_` will be created in ``tmp_dir``.
         clobber : bool, optional
             Whether to overwrite pre-existing results.
         """
@@ -1169,7 +1171,12 @@ class IFUCube(object):
         # starlight has filepath character length issues, plus
         # then it doesn't clog up cwd.
         # Make a safe temporary directory to hold everything
-        sl_tmp_dir = os.path.join(tempfile.mkdtemp(prefix="starlight_"), "")
+        sl_tmp_dir = tempfile.mkdtemp(prefix="sl_", dir=tmp_dir)
+        sl_tmp_dir = os.path.join(os.path.abspath(sl_tmp_dir), "")
+        if len(sl_tmp_dir) > 40:
+            warnings.warn("Temporary directory file path is quite long. "
+                          "starlight may have problems: {}"
+                          .format(sl_tmp_dir), RuntimeWarning)
         print("STARLIGHT tmp directory for this run is {}"
               .format(sl_tmp_dir))
         # Because shutil.copytree requires `dst` doesn't exist:
@@ -1256,7 +1263,7 @@ class IFUCube(object):
                 bin_res["bad"] = 0
                 bin_res.update(sl_results)
             else:
-                print("no sl_output found for bin {}".format(bn))
+                print("no sl_output found for bin {:<20}".format(bn))
                 bin_res["bad"] = 1
         print()
 

@@ -366,11 +366,11 @@ Stellar continuum fitting is performed via `STARLIGHT
   >>> cube.run_starlight()
   running starlight fitting
   fitting [n] bins...
-  STARLIGHT tmp directory for this run is /tmp/starlight_[random]/
+  STARLIGHT tmp directory for this run is /tmp/sl_[random]/
   resampling base files [i]/[m]
   fitting bin number [i]
   parsing results
-  [failed to parse /tmp/starlight_[random]/spec_[random]_out for bin [j]]
+  [failed to parse /tmp/sl_[random]/spec_[random]_out for bin [j]]
   parsing starlight output [i]/[n]
 
 **Extended version:**
@@ -383,8 +383,7 @@ By default all bins will be fitted, or a list of bin numbers can be passed
 explicitly as the :attr:`bin_num` argument. The default set of bases are 45
 Bruzual & Charlot (2003) models, this can be changed through the use of the
 ``base_name`` argument and the inclusion of the appropriate files in
-:attr:`sl_dir` (see below). A temporary directory is also created
-`/tmp/starlight_[random]` to store all the output.
+:attr:`sl_dir` (see below). A temporary directory is also created (`sl_[random]`) to store all the output - by default this is created inside the system's tmp location (set by the environment **$TMP** or similar), but can be manually given with the ``tmp_dir`` argument to :meth:`~ifuanal.IFUCube.run_starlight`.
 
 :meth:`~ifuanal.IFUCube.run_starlight` searches :attr:`sl_dir` (default is
 `starlight/` subdir of ifuanal\'s directory) for the following files:
@@ -404,9 +403,9 @@ Bruzual & Charlot (2003) models, this can be changed through the use of the
 The process for a single bin is as follows:
 
 1. Access the spectrum of the bin via :ref:`results-dict`.
-2. Write this spectrum to `/tmp/starlight_[random]/spec_[random]`.
+2. Write this spectrum to ``tmp_dir``\ `/sl_[random]/spec_[random]`.
 3. Write a `grid` file used by STARLIGHT to
-   `/tmp/starlight_[random]/grid_[random]`.
+   ``tmp_dir``\ `/sl_[random]/grid_[random]`.
 4. Call the STARLIGHT executable for this bin and return the file name of the
    output (the spectrum file with a `_out` suffix).
 
