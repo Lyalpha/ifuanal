@@ -35,7 +35,8 @@ extensions = [
     'sphinx.ext.mathjax',
     'sphinx.ext.viewcode',
     'sphinx.ext.autodoc',
-    'sphinx.ext.napoleon'
+    'sphinx.ext.napoleon',
+    'sphinx.ext.graphviz'
 ]
 napoleon_numpy_docstring = True
 # Napoleon correctly handle multiple arguments with same description

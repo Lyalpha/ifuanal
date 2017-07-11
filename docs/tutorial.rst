@@ -4,9 +4,10 @@ Tutorial
 ifuanal requires a reduced (i.e. sky-subtracted, flux- and
 wavelength-calibrated) datacube as ingestion.
 
-This tutorial will use an example workflow that performs :ref:`stellar
+This tutorial will use an example work-flow that performs :ref:`stellar
 continuum <cont-fitting>` and :ref:`emission line <emission-fitting>` fitting
-and subsequent :ref:`analysis <analysis>` on a MUSE data cube.
+on a MUSE data cube. How to access the full :ref:`results <results-dict>` and
+make quick diagnostic :ref:`plots <plotting>` is also given.
 
 A description of the processes in each step as well as some of the pertinent
 arguments is given below. For a full description of optional arguments and
@@ -20,13 +21,13 @@ type ``object?`` from within an IPython session to find out about
   `suffix.extension`. The prefix will be that of the cube being analysed (minus
   the filename extension).
 * By default, ifuanal will spawn ``min(Ncpu-1, Ncpu*0.9)`` processes for the
-  multiprocessed parts of the analyses where ``Ncpu`` is the number of cpus on
+  multi-processed parts of the analyses where ``Ncpu`` is the number of cpus on
   the system (this is saved under the attribute :attr:`n_cpu` and can be changed
   manually).
-* Emission lines to fit are defined in the file `data/emissionlines.json`.
+* Emission lines to fit are defined in the file `data/emission_lines.json`.
   Additional lines can be fit for by copying this file and manually adding new
   entries, and giving the filepath of this new file via the ``el_json``
-  argument (alternatively a pythin ``dict`` can be passed of the same format)
+  argument (alternatively a python ``dict`` can be passed of the same format)
   **If the existing entries in the default line list are removed or altered
   some plotting may fail that relies on these lines**. No sanity checking of
   the lines is done, so make sure they are sensible for the data being analysed
@@ -55,7 +56,7 @@ type ``object?`` from within an IPython session to find out about
 Create a new instance
 ---------------------
 
-For this example MUSE science verification data of the target **NGC2906** will
+For this example MUSE science verification data of the target **NGC 2906** will
 be analysed.
 
 ::
@@ -73,7 +74,7 @@ small manipulation to the MUSE FITS file input before ingestion to
   ``ebv`` can be passed to :class:`~ifuanal.MUSECube` to explicitly set this,
   otherwise its default value of "IRSA" will contact the Infrared Science
   Archive to automatically determine it based on the coordinates of the WCS
-  reference pixel of the cube (this requires the optional dependancy
+  reference pixel of the cube (this requires the optional dependency
   :mod:`astroquery` to be installed).
 * Add a PRIMARY header card `IFU_Z` specifying the redshift. In the example
   case this is `0.007138`
@@ -121,7 +122,7 @@ The wavelength array attribute :attr:`lamb` is updated with the deredshifting:
   >>> print("{:.2f}, {:.2f}".format(cube.lamb[0], cube.lamb[-1]))
   4711.66, 9274.52
 
-Mask foregound/background sources
+Mask foreground/background sources
 ---------------------------------
 
 We can remove spaxels from the data cube (by setting their values to ``np.nan``)
@@ -151,7 +152,7 @@ Find the galaxy centre
 ----------------------
 
 We need to provide an initial guess to find centre of the galaxy, usually by
-simply eyeballing the cube. This can be given in pixel coordinates or RA and
+simply eye-balling the cube. This can be given in pixel coordinates or RA and
 DEC if the argument ``usewcs = True``. The centre is found by fitting a 2D
 gaussian to a region around this initial guess.
 
@@ -167,7 +168,7 @@ and residual for checking (``plot=False`` to skip this).
 
 .. TODO::
 
-   The use of this in the analsis is currently quite limited. Further updates
+   The use of this in the analysis is currently quite limited. Further updates
    will use this to calculate e.g. deprojected distances of bins and provide
    maps in terms of offset from the centre.
 
@@ -182,7 +183,7 @@ circumvent this we employ spaxel binning in order to group areas of physically r
 
 The spaxels are to be binned into distinct regions in order to increase the S/N
 of the composite region spectra for fitting. :ref:`hii-binning`, :ref:`near-binning` and :ref:`vor-binning` are currently implemented methods, with the ability
-to also :ref:`add custom bins <custom-bins>`. For observations of starforming galaxies, the :ref:`near-binning` is the preferred method to bin into distinct star formation regions of the galaxy.
+to also :ref:`add custom bins <custom-bins>`. For observations of star-forming galaxies, the :ref:`near-binning` is the preferred method to bin into distinct star formation regions of the galaxy.
 
 These binning routines will populate :ref:`results-dict` with each bin. The
 information is stored as follows for bin number ``bn``: ::
@@ -411,9 +412,9 @@ The process for a single bin is as follows:
 
 Once all bins are fit, a call to :meth:`~ifuanal.IFUCube._parse_continuum` then
 reads these STARLIGHT output files and parses the information into the
-`"continuum"` entry in :attr:``results`` for each bin (see
+`"continuum"` entry in :attr:`results` for each bin (see
 :ref:`results-dict`). The dictionary entry `"continuum"` is populated with the
-results of the STARLIGH fitting, please consulte the STARLIGHT documentation
+results of the STARLIGHT fitting, please consult the STARLIGHT documentation
 (section 6 of the version 4 manual) for more information on these. In
 particular, `"bases"` is the population mixture of the bases used to create the
 best fitting continuum and `"sl_spec"` is the synthetic spectrum.
@@ -462,7 +463,7 @@ have a valid STARLIGHT output) are fit, or a list of specific bins to be fit
 can be passed as ``bin_num``.
 
 Especially with lower SNR features, the fitter is susceptible to finding local
-minima in the LSQ sense and is sensitive to the inital guess for the
+minima in the LSQ sense and is sensitive to the initial guess for the
 amplitude, mean and standard deviation of the gaussians. To circumvent this a
 somewhat brute force method is overlaid on the fitter minimisation, as
 well as applying some conditions to the fitted parameters:
@@ -484,7 +485,7 @@ well as applying some conditions to the fitted parameters:
 * The offset of the lines is limited to between -500 and +500 km/s (from the
   overall :ref:`deredshifted cube <deredden-deredshift>`) by
   default, this can be altered with the argument ``offset_bounds``.
-* The offset of the balmer lines are tied to be the same. The forbidden lines
+* The offset of the Balmer lines are tied to be the same. The forbidden lines
   are also tied to each other but they can differ from the balmer values.
 * The standard deviation width of the fits can differ between lines, but any
   doublets (or triplets) are forced to be fit with the same width.
@@ -498,7 +499,7 @@ and the :math:`\chi^2`/dof value of the fit stored; the minimum
 Parameters and their uncertainties are stored within the :ref:`results-dict`.
 When a fitting is deemed to fail (``no covariance matrix computed for bin i
 ...``) this is either due to an inherently low SNR emission line spectrum or
-the fitting encounted one of the bounding conditions of the fit
+the fitting encountered one of the bounding conditions of the fit
 (``stddev_bounds`` or ``offset_bounds``). In the latter case the covariance of
 the fitted parameters cannot be computed and an inspection of the fit via: ::
 
@@ -511,7 +512,7 @@ appropriate initial guesses should help the fit.
 
 In the case of broad continuum residuals that are affecting the fitting, these
 can be removed somewhat arbitrarily by using the argument ``filtwidth``.  This
-sets the width in wavelength units of a median filter tophat kernel, which is
+sets the width in wavelength units of a median filter top-hat kernel, which is
 applied to the residual emission line spectrum. This median filtered function
 is then removed from the spectrum prior to fitting. It is important to not fit
 the emission line of interest with this convolved function so ``filtwidth``
@@ -541,7 +542,7 @@ will be searched for when loading the instance and so a copy should be left
 alongside the pickle file.
 
 The instance can then be loaded later to return to the same state, by
-specifiying the pickle file to load:::
+specifying the pickle file to load:::
 
   >>> cube2 = ifuanal.IFUCube.load_pkl("NGC2906.pkl")
   loaded pkl file NGC2906.pkl
@@ -556,34 +557,242 @@ And ``cube2`` will have all the attributes of the ``cube`` class, e.g.: ::
    The attribute :attr:`n_cpu` is updated upon loading an instance to be
    appropriate for the system being used.
 
-.. _analysis:
-
-Analysis
---------
-
-After the fitting has been done for the continuum and emission lines, then we
-can do all this fancy stuff...
 
 .. _results-dict:
 
-the :attr:`results` dictionary
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-As an example, to see the results for a bin of number
-``bn``, type: ::
+The :attr:`results` dictionary
+------------------------------
 
-  >>> cube.results["bin"][bn]
+After the fitting has been done for the continuum and emission lines, the results for all fitting can be accessed via the  :attr:`results` dictionary ::
 
-The ``results`` dictionary contains...
+  >>> cube.results  # not recommended as will print everything to screen!
+  [... extremely long output ...]
 
-.. TODO::
-   Write this section.
+Except the location of the nucleus (which can also be accessed via
+``cube.nucleus``), all bin results are held in individual sub-dicts of the
+:attr:`results` dict.
+
+The results dict will contain an entry for each of the bins produced by
+:ref:`binning <binning>`: 0, 1 ... N. Additionally there will be negative entries
+starting at -1 equal to the number of :ref:`custom bins <custom-bins>`
+added.
+
+Visualisations of the :attr:`results` dict and sub-dicts are shown below. These
+can be followed to obtain the desired value for bin number ``bn`` such as in
+the following examples: ::
+
+  >>> cube.results["bin"][bn]["dist_mean"]
+  >>> cube.results["bin"][bn]["emission"]["metallicity"]["D16"]
+
+.. graphviz::
+
+  digraph results {
+    graph [rankdir=LR, splines=1]
+    node [style="rounded", shape=box, color="#2980B9"]; bin; bn; continuum;
+    dist_max; dist_mean; dist_min; emission; mean; nucleus; spax; spec;
+    bin, bn, continuum, emission, results [fontname="bold"];
+    results -> {bin nucleus}
+    bin -> bn
+    bn -> {continuum dist_max dist_mean dist_min emission mean spax spec}
+    }
+
+============= ===== ===========================================================
+``continuum`` dict  dict containing results of STARLIGHT continuum fitting,
+                    see :ref:`continuum-results`
+``dist_max``  float the maximum pixel distance of the bin from the nucleus
+``dist_mean`` float the bin seed peak (or mass-weighted centre for voronoi
+                    binning) distance from the nucleus
+``dist_min``  float the minimum pixel distance of the bin from the nucleus
+``emission``  dict  dict containing results of emission line fitting,
+                    see :ref:`continuum-results`
+``mean``      array pixel coordinates of bin seed peak (or mass-weighted centre
+                    for voronoi binning) in cube
+``spax``      tuple the pixel coordinates of all spaxels assigned to the bin
+                    in the format ([x0,x1..xn], [y0,y1..yn]).
+``spec``      array a ``4 x N`` array where ``N`` is the length of the
+                    spectral axis of the input cube. Columns are wavelength,
+                    flux, flux stddev, flag (=2 for negative/nan flux values).
+============= ===== ===========================================================
+
+.. _continuum-results:
+
+``continuum`` results
+^^^^^^^^^^^^^^^^^^^^^
+
+The results of STARLIGHT fitting are contained in: ::
+
+  >>> cube.results["bin"][bn]["continuum"]
+
+.. graphviz::
+
+  digraph results {
+    graph [rankdir=LR, splines=1]
+    node [style="rounded", shape=box, color="#2980B9"]
+    continuum [fontname="bold"]
+    continuum -> { bad bases  ebv_star fobs_norm sl_output sl_spec
+                  v0_min vd_min}
+  }
+
+============= ======= =========================================================
+``bad``       int     flag that is set to ``1`` in the case of failed
+                      continuum fitting by ifuanal for this bin.
+``bases``     array   the relative contributions of each base used by SSP taken
+                      from the STARLIGHT output file. See the STARLIGHT manual
+                      for more information.
+``ebv_star``  float   best fitting colour excess fit for by STARLIGHT.
+``fobs_norm`` float   normalising flux of the continuum used by STARLIGHT.
+``sl_output`` string  file path to the STARLIGHT output file for this bin.
+``sl_spec``   array   a ``4 x N`` array where ``N`` is the length of the
+                      spectral axis of the input cube. Columns are wavelength,
+                      observed, model, error. See STARLIGHT manual for more
+                      information.
+``v0_min``    float   best fitting velocity offset of the stars in km/s
+                      (relative to the redshift of the cube - i.e. generally the
+                      central redshift of the galaxy).
+``vd_min``    float   best fitting velocity dispersion of the stars in km/s
+============= ======= =========================================================
 
 
-plotting
-^^^^^^^^
+Additionally, there are entries for ``adev``, ``AV_min``, ``chi2Nl_eff``,
+``Mcor_tot``, ``Mini_tot``, ``N_base``, ``Nl_eff``, ``Nl_obs``, ``NOl_eff`` in
+the ``continuum`` dict. These are taken directly from the STARLIGHT output
+file, with further information on them given by the STARLIGHT manual.
 
-Once all fitting has been done, maps of the bins and the results of the fitting
-methods can be made.See the docs for each method for more info.
+.. _emission-results:
+
+``emission`` results
+^^^^^^^^^^^^^^^^^^^^
+
+The results of emission line fitting are contained in: ::
+
+  >>> cube.results["bin"][bn]["emission"]
+
+.. graphviz::
+
+  digraph results {
+    graph [rankdir=LR, splines=1]
+    node [style="rounded", shape=box, color="#2980B9"]
+    bad; chi2dof; ebv_gas; emission [fontname="bold"]; filtwidth; lines
+    [fontname="bold"]; metallicity [fontname="bold"]; resid_fn;
+    emission -> {bad chi2dof ebv_gas filtwidth lines metallicity resid_fn}
+  }
+
+=============== ======= ========================================================
+``bad``         int     flag that is set to ``1`` in the case of failed
+                        emission line fitting by ifuanal for this bin.
+``chi2dof``     float   estimator of goodness of fit - note that this is not an
+                        absolute indicator of goodness of fit but is used only
+		        to select the best initial guess parameters
+``ebv_gas``     float   the color excess as determined from the Balmer decrement
+``filtwidth``   float   the width in spectral elements of the median filter
+                        kernel used to remove underlying continuum residuals,
+			None if not used
+``lines``       dict    dict of fitting results for each emission line, see
+                        :ref:`lines-results`
+``metallicity`` dict    dict of metallicity indicators calculated, see
+                        :ref:`metallicity-results`
+``resid_fn``    array   the residual function fit by the median filter kernel,
+                        0.0 if not used
+=============== ======= ========================================================
+
+.. _lines-results:
+
+``lines`` results
+"""""""""""""""""
+
+For each of the lines given in the input ``el_json`` argument to ifuanal,
+an entry will exist in ``lines`` as `[name]_[wavelength as int]`. For example,
+the default ``el_json`` input (`data/emission_lines.json`) of: ::
+
+    {
+     "Hbeta": [4861.33],
+     "[OIII]": [4958.911, 5006.843],
+     "Halpha": [6562.77],
+     "[NII]": [6548.05, 6583.45],
+     "[SII]": [6716.440, 6730.815]
+    }
+
+produces the following entries: ``Hbeta_4861``, ``[OIII]_4959``,
+``[OIII]_5007``, ``[NII]_6548``, ``[NII]_6583``, ``Halpha_6563``,
+``[SII]_6716``, ``[SII]_6731``. An example entry for line name ``line_xxxx``
+is shown below.
+
+.. graphviz::
+
+  digraph results {
+    graph [rankdir=LR, splines=1]
+    node [style="rounded", shape=box, color="#2980B9"]
+    cont; emission [fontname="bold"]; ew; fit_params; fit_uncerts; flux; fwhm;
+    line_xxxx [fontname="bold"]; mean; offset; rest_lambda; snr
+    emission -> line_xxxx
+    line_xxxx -> {cont ew fit_params fit_uncerts flux fwhm mean offset
+                  rest_lambda snr }
+  }
+
+=============== ======= =======================================================
+``cont``         array  value of the neighbouring continuum and uncertainty
+``ew``           array  equivalent width and uncertainty
+``fit_params``   array  the raw fitted params of the gaussian: amp, mean, sigma
+``fit_uncerts``  array  the statistical uncertainties on the fitted params
+``flux``         array  flux of the line and uncertainty
+``fwhm``         array  FWHM in km/s of the line
+``mean``         array  central wavelength of the line
+``offset``       array  offset of the central wavelength from the rest
+                        wavelength in km/s
+``rest_lambda``  float  rest wavelength of the line
+``snr``          float  signal to noise ratio of the line detection
+=============== ======= =======================================================
+
+In most cases (except where given), values are in units of the
+input cube in terms of flux and wavelength units.
+
+.. _metallicity-results:
+
+``metallicity`` results
+"""""""""""""""""""""""
+
+Some metallicity indicators are calculated within ifuanal. Custom indicators
+can be calculated by using directly the emission line fluxes.
+
+.. graphviz::
+
+  digraph results {
+    graph [rankdir=LR, splines=1]
+    node [style="rounded", shape=box, color="#2980B9"]
+    D16; emission [fontname="bold"]; M13_N2; M13_O3N2
+    metallicity [fontname="bold"]; PP04_N2; PP04_O3N2
+    emission -> metallicity
+    metallicity -> {D16 M13_N2 M13_O3N2 PP04_N2 PP04_O3N2}
+  }
+
+============= ===== ===========================================================
+``D16``       array Dopita et al. 2016, Ap&SS, 361, 61 (eq 1&2) metallicity and
+                    uncertainty
+``M13_N2``    array Marino et al. 2013, A&A, 559, 114 (eq 4)  metallicity and
+                    uncertainty
+``M13_O3N2``  array Marino et al. 2013, A&A, 559, 114 (eq 2)  metallicity and
+                    uncertainty
+``PP04_N2``   array Pettini & Pagel 2004, MNRAS, 348, 59 (eq 1) metallicity and
+                    uncertainty
+``PP04_O3N2`` array Pettini & Pagel 2004, MNRAS, 348, 59 (eq 3) metallicity and
+                    uncertainty
+============= ===== ===========================================================
+
+
+.. _plotting:
+
+Plotting
+--------
+
+Once all fitting has been done, some in built plotting methods provide quick
+look information on the results. See the docs for each method for more info,
+and their source code to produce nicer plots!
+
+Alternatively, 2D fits images of values can be produced with
+:meth:`~ifuanal.IFUCube.make_2dfits`.
+
+plot methods
+^^^^^^^^^^^^
 
 :meth:`~ifuanal.IFUCube.plot_continuum`
 """""""""""""""""""""""""""""""""""""""
@@ -611,7 +820,7 @@ the continuum fits as a map.
 
 :meth:`~ifuanal.IFUCube.plot_metallicity`
 """""""""""""""""""""""""""""""""""""""""
-plots the metallicity for the chosen indicator as a map aslongside the
+plots the metallicity for the chosen indicator as a map alongside the
 cumulative metallicity of the bins and a radial dependancy plot. If the
 argument ``cumweight`` is ``True`` then the cumulative plot is weighted
 by the SFR of each bin (i.e. the H\ :math:`\alpha` flux).
