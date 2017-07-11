@@ -1,6 +1,13 @@
 Changelog
 =========
 
+v0.4.dev
+--------
+
+ * Added ``tmp_dir`` argument to :meth:`~ifuanal.IFUCube.run_starlight`
+ * Added :meth:`~ifuanal.IFUCube.make_2dfits`
+ * Allow :meth:`~ifuanal.IFUCube.mask_regions` radii to be floats
+
 v0.4.0
 ------
  * :attr:`results` dict has been reimplemented with a new structure and now
