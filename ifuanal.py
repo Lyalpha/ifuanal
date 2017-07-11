@@ -2022,11 +2022,11 @@ class IFUCube(object):
         """
         Plot the BPT diagram for all bins
 
-        The [NII]/Halpha vs [OIII]/Hbeta [BPT]_ diagram is plotted for each
-        bin, along with a 2D map showing the classification of each
-        bin. Classification dividing relations are taken from [K13]_ for the
-        AGN-HII division, and [K01]_ for the theretical star-formation driven
-        limit.
+        The [NII]/H\ :math:`\\alpha` vs [OIII]/H\ :math:`\\beta` [BPT]_ diagram
+        is plotted for each bin, along with a 2D map showing the classification
+        of each bin. Classification dividing relations are taken from [K13]_
+        for the AGN-HII division, and [K01]_ for the theretical star-formation
+        driven limit.
 
         References
         ----------
