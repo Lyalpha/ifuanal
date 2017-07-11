@@ -1576,8 +1576,8 @@ class IFUCube(object):
         -------
         Create a 2D fits image of the H\ :math:`\\alpha` flux in each bin
 
-        ``>>> IFUCube.results_to_2dfits(["emission", "lines", "Halpha_6563",``\
-        ``"flux"], "Halphaflux")``
+        ``>>> IFUCube.results_to_2dfits(["emission", "lines", "Halpha_6563",
+        "flux"], "Halphaflux")``
 
         As above but including the uncertainty in a second extension
 
@@ -1586,8 +1586,8 @@ class IFUCube(object):
 
         Create a D16 metallicity map with uncertainty in second extension
 
-        ``>>> IFUCube.results_to_2dfits(["emission", "metallicity", "D16"],``\
-        ``"D16", uncert_idx=1)``
+        ``>>> IFUCube.results_to_2dfits(["emission", "metallicity", "D16"],
+        "D16", uncert_idx=1)``
         """
         outfile = "{}_2D_{}.fits".format(self.base_name, suffix)
         if not clobber and os.path.isfile(outfile):
