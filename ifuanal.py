@@ -1545,13 +1545,14 @@ class IFUCube(object):
 
     def make_2dfits(self, keys, suffix, idx=0, uncert_idx=None, clobber=False):
         """
-        Create a 2D fits image of bin values
+        Create a 2D fits image of bin values.
 
-        The choice of value to save is specified by a list of ``keys`` in order
-        to navigate each bin's results dictionary. See tutorial documentation
-        for layout of ``results`` dict. The first index of the value is used,
-        optionally a second extension can be saved which will use the second
-        index of the value (the uncertainty, where)
+        The choice of value to make a 2D map of is specified by a list of
+        ``keys`` in order to navigate each bin's results dictionary. See
+        tutorial documentation for layout of ``results`` dict. The ``idx``
+        index of the value is used, optionally a second extension can be saved
+        which will use the ``uncert_idx`` index of the value (generally the
+        uncertainty).
 
         Parameters
         ----------
@@ -1560,14 +1561,14 @@ class IFUCube(object):
             bin value.
         suffix : str
             The suffix to add to the cube's file name when saving the fits
-            file. Saved as [cube name]_2D_[suffix].fits
+            file. Saved as `[cube name]_2D_`\ ``suffix``\ `.fits`
         idx : int, optional
             If the value is an array, this specifies the index of the array to
             plot.
         uncert_idx : None or int, optional
-            If ``uncert_idx`` is not None, this index of the array will be
-            saved as a second extension in the fits file (i.e. to save the
-            uncertainty associated with each value).
+            If not ``None``, this index of the array will be saved as a second
+            extension in the fits file (e.g. to save the uncertainty associated
+            with each value).
         clobber : bool, optional
             Whether to overwrite an existing file.
 
@@ -1575,18 +1576,18 @@ class IFUCube(object):
         -------
         Create a 2D fits image of the H\ :math:`\\alpha` flux in each bin
 
-        ``>>> IFUCube.results_to_2dfits(["emission", "lines", "Halpha_6563",``\
-        ``    "flux"], "Halphaflux")``
+        ``>>> IFUCube.results_to_2dfits(["emission", "lines", "Halpha_6563",\
+              "flux"], "Halphaflux")``
 
         As above but including the uncertainty in a second extension
 
-        ``>>> IFUCube.results_to_2dfits(["emission", "lines", "Halpha_6563",``\
-        ``    "flux"], "Halphafluxuncert", uncert_idx=1)``
+        ``>>> IFUCube.results_to_2dfits(["emission", "lines", "Halpha_6563",\
+              "flux"], "Halphafluxuncert", uncert_idx=1)``
 
         Create a D16 metallicity map with uncertainty in second extension
 
-        ``>>> IFUCube.results_to_2dfits(["emission", "metallicity", "D16"],``\
-        ``    "D16", uncert_idx=1)``
+        ``>>> IFUCube.results_to_2dfits(["emission", "metallicity", "D16"],\
+              "D16", uncert_idx=1)``
         """
         outfile = "{}_2D_{}.fits".format(self.base_name, suffix)
         if not clobber and os.path.isfile(outfile):
