@@ -1276,9 +1276,8 @@ class IFUCube(object):
         """
         Fit emission lines in the continuum-subtracted spectra with gaussians.
 
-        Based on the contents of `data/emission_lines.json`, a series of
-        gaussians will be fit to those emission lines.  The fitting is
-        performed in a brute force manner over a range of initial guesses to
+        A series of gaussians will be fit to the emission lines.  The fitting
+        is performed in a brute force manner over a range of initial guesses to
         attempt to find the global minimum. As such, increasing the length of
         the initial guesses for the width, mean and amplitude (``vd_init``,
         ``v0_init`` and ``amp_init`` respectively) will dramatically increase
