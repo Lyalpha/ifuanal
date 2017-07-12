@@ -668,10 +668,10 @@ class IFUCube(object):
         print()
         print("found {} bins".format(len(bin_nums)))
 
-    def nearest_bin(self, min_peak_flux, max_radius, min_flux, min_npix=8,
-                    line_lamb=6562.8, weighted=True, weight_pow=1/3., niter=1,
-                    max_filter_size=5, border=3, smooth=0.5, plot=True,
-                    clobber=False, **kwargs):
+    def nearest_bin(self, min_peak_flux, max_radius, min_flux, min_frac_flux=0,
+                    min_npix=8, line_lamb=6562.8, weighted=True,
+                    weight_pow=1/3., niter=1, max_filter_size=5, border=3,
+                    smooth=0.5, plot=True, clobber=False, **kwargs):
         """
         Create bins based on pixels proximity to peaks, largely derived from
         [LRN]_.
@@ -683,9 +683,11 @@ class IFUCube(object):
         within ``n_iter`` pixels of a pixel with value less than ``min_flux``
         or a masked (nan) pixel are rejected.  The closest peak to each pixel
         is determined forming the basis of the bins. Those pixels further than
-        ``max_radius`` from a peak or below ``min_flux`` are then
-        removed. Islands of pixels separated from the bin underlying their
-        nearest peak, and bins with less than ``min_npix`` pixels are removed.
+        ``max_radius`` from a peak or below ``min_flux`` are then removed. If
+        ``min_frac_flux`` is > 0 then pixels less than the ``min_frac_flux``
+        times the peak flux are also removed. Islands of pixels separated from
+        the bin underlying their nearest peak, and bins with less than
+        ``min_npix`` pixels are removed.
 
         The optional argument ``weighted`` will apply a weighting to the
         distances of each peak based on the sum of the flux in each unweighted
@@ -707,6 +709,9 @@ class IFUCube(object):
         min_flux : float
             The minimum flux of a spaxel for consideration in the binning
             routine.
+        min_frac_flux : float, optional
+            The minimum flux of a spaxel, as a fraction of the bin's peak flux,
+            to be considered a member of the bin.
         min_npix : float, optional
             The minimum number of pixels required for a bin.
         line_lamb : float, optional
@@ -847,14 +852,17 @@ class IFUCube(object):
             near_mapw = nearestw.reshape(line_map.shape).astype(float) + 1
             near_mapw[near_map == 0] = 0  # apply all bin rejection as above
             near_map = near_mapw
-        # Remove pixels not connected to *their* peak
-        for i in range(1, len(peak_xy)+1):
+        # Remove pixels not connected to *their* peak or below min_frac_flux
+        # of the peak
+        for i, xy in enumerate(peak_xy, 1):
             _nrmap = np.copy(near_map)
             _nrmap[_nrmap != i] = 0
             _lblmap, _nlbl = ndimage.label(_nrmap)
             _goodlbl = np.unique(_lblmap[peaks])
             _goodlblmap = np.in1d(_lblmap, _goodlbl).reshape(_nrmap.shape)
             near_map[(~_goodlblmap) & (_nrmap > 0)] = 0
+            peak_val = line_map[xy[0], xy[1]]
+            near_map[(line_map < min_frac_flux * peak_val) & (_nrmap > 0)] = 0
         # Change back to zero-index labels and nans for bad pixels
         near_map[near_map == 0] = np.nan
         near_map -= 1
