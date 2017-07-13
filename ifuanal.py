@@ -2123,7 +2123,7 @@ class IFUCube(object):
         print("plot saved to {}_metallicity_{}.pdf".format(self.base_name,
                                                            indicator))
 
-    def plot_bpt(self):
+    def plot_bpt(self, snrlimit=3):
         """
         Plot the BPT diagram for all bins
 
@@ -2132,6 +2132,12 @@ class IFUCube(object):
         of each bin. Classification dividing relations are taken from [K13]_
         for the AGN-HII division, and [K01]_ for the theretical star-formation
         driven limit.
+
+        Parameters
+        ----------
+        snrlimit: float, optional
+            Only bins where all lines were detected above this value will be
+            plotted.
 
         References
         ----------
@@ -2164,8 +2170,8 @@ class IFUCube(object):
             bin_res = self.results["bin"][bn]
             snr = np.array([bin_res["emission"]["lines"][line]["snr"]
                             for line in lines])
-            # Do not plot for any bins without significant line detections
-            if not all(snr > 3):
+            # Do not plot for any bins below snrlimit
+            if not all(snr > snrlimit):
                 continue
             f = [bin_res["emission"]["lines"][line]["flux"][0] for line in
                  lines]
