@@ -1474,26 +1474,28 @@ class IFUCube(object):
                 emlines[line]["mean"] = [mean, mean_sig]
 
             # Calculate E(B-V)_gas based on balmer decrement
-            # eq. 1 Kreckel et al. (1305.2923)
-            if (emlines["Hbeta_4861"]["snr"] > 3 and
-               emlines["Halpha_6563"]["snr"] > 3):
-                flux_Hb = emlines["Hbeta_4861"]["flux"][0]
-                flux_Ha = emlines["Halpha_6563"]["flux"][0]
-                lamb_Hb_Ha = [emlines["Hbeta_4861"]["rest_lambda"],
-                              emlines["Halpha_6563"]["rest_lambda"]]
-                k_Hb, k_Ha = get_Alamb(lamb_Hb_Ha, 0.0, self.RV)[1]
-                ebv = (2.5/(k_Hb - k_Ha)) * np.log10((flux_Ha/flux_Hb)/2.86)
-                # Correct fluxes for E(B-V)_gas
-                # FIXME uncertainty in E(B-V)_gas not propagated onto new
-                # dereddened fluxes (errors are correlated)
-                for line in emlines:
-                    Alamb = get_Alamb(emlines[line]["mean"][0],
-                                      ebv, self.RV)[0]
-                    corr = 10**(0.4 * Alamb)
-                    emlines[line]["flux"] *= corr
-                    emlines[line]["ew"] *= corr
-            else:
+            try:
+                Hb_snr = emlines["Hbeta_4861"]["snr"]
+                Ha_snr = emlines["Halpha_6563"]["snr"]
+            except KeyError:
                 ebv = np.nan
+            else:
+                if (Hb_snr > 3 and Ha_snr > 3):
+                    flux_Hb = emlines["Hbeta_4861"]["flux"][0]
+                    flux_Ha = emlines["Halpha_6563"]["flux"][0]
+                    lamb_Hb_Ha = [emlines["Hbeta_4861"]["rest_lambda"],
+                                  emlines["Halpha_6563"]["rest_lambda"]]
+                    k_Hb, k_Ha = get_Alamb(lamb_Hb_Ha, 0.0, self.RV)[1]
+                    ebv = (2.5/(k_Hb - k_Ha)) * np.log10((flux_Ha/flux_Hb)/2.86)
+                    # Correct fluxes for E(B-V)_gas
+                    # FIXME uncertainty in E(B-V)_gas not propagated onto new
+                    # dereddened fluxes (errors are correlated)
+                    for line in emlines:
+                        Alamb = get_Alamb(emlines[line]["mean"][0],
+                                          ebv, self.RV)[0]
+                        corr = 10**(0.4 * Alamb)
+                        emlines[line]["flux"] *= corr
+                        emlines[line]["ew"] *= corr
             bin_res["ebv_gas"] = ebv
 
             # Determine metallicities where possible using SNR>3 lines only
