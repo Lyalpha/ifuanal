@@ -2002,7 +2002,7 @@ class IFUCube(object):
 
         # Add common x and y labels
         bigax = elfig.add_subplot(111, frameon=False)
-        bigax.set_axis_bgcolor("none")
+        bigax.set_facecolor("none")
         bigax.tick_params(labelcolor="none", top="off", bottom="off",
                           left="off", right="off")
         bigax.set_ylabel("Flux [{}]".format(self.flux_unit))
