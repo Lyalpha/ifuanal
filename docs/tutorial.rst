@@ -554,9 +554,11 @@ And ``cube2`` will have all the attributes of the ``cube`` class, e.g.: ::
 
 .. NOTE::
 
-   The attribute :attr:`n_cpu` is updated upon loading an instance to be
-   appropriate for the system being used.
-
+   * The attribute :attr:`n_cpu` is updated upon loading an instance to be
+     appropriate for the system being used.
+   * If you want to do continuum fitting on an instance loaded on a
+     new machine, it will complain that it cannot find the STARLIGHT
+     directory - manually alter cube.sl_dir to fix this.
 
 .. _results-dict:
 
