@@ -1474,11 +1474,12 @@ class IFUCube(object):
                 emlines[line]["mean"] = [mean, mean_sig]
 
             # Calculate E(B-V)_gas based on balmer decrement
+            ebv = np.nan
             try:
                 Hb_snr = emlines["Hbeta_4861"]["snr"]
                 Ha_snr = emlines["Halpha_6563"]["snr"]
             except KeyError:
-                ebv = np.nan
+                pass
             else:
                 if (Hb_snr > 3 and Ha_snr > 3):
                     flux_Hb = emlines["Hbeta_4861"]["flux"][0]
