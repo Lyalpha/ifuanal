@@ -680,7 +680,7 @@ class IFUCube(object):
         :func:`~ifuanal.get_line_map` through subtraction of a continuum from a
         narrow band filter centred on the emission line. Peaks above
         ``min_peak_flux`` in the emission line map are seeds for bins. Any peak
-        within ``n_iter`` pixels of a pixel with value less than ``min_flux``
+        within ``niter`` pixels of a pixel with value less than ``min_flux``
         or a masked (nan) pixel are rejected.  The closest peak to each pixel
         is determined forming the basis of the bins. Those pixels further than
         ``max_radius`` from a peak or below ``min_flux`` are then removed. If
@@ -723,7 +723,7 @@ class IFUCube(object):
         weight_pow : float, optional
             The power index used in the weighting of distances, requires
             ``weighted = True``
-        n_iter : int, optional
+        niter : int, optional
             Peaks within this number of pixels of a masked (nan) or <
             ``min_flux`` pixel will be removed. This can help eliminate noise
             spikes as bin seeds.
@@ -795,7 +795,7 @@ class IFUCube(object):
         peaks[-border:, :] = 0
         peaks[:, :border] = 0
         peaks[:, -border:] = 0
-        # Remove peaks within n_iter of a pixel < min_flux
+        # Remove peaks within niter of a pixel < min_flux
         struct = ndimage.generate_binary_structure(2, 1)
         toofaint = ndimage.binary_dilation(line_map < min_flux,
                                            structure=struct,
