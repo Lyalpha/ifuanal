@@ -202,8 +202,8 @@ information is stored as follows for bin number ``bn``: ::
 For Vornoi binning, ``mean`` is the centre of mass, whereas for the HII region
 binning, this is the seed peak.
 
-In the case of a single spaxel bin, ``spec`` is just copied from the input data
-and stddev cube. For a multi-spaxel bin, the weighted mean of the data and
+In the case of a single spaxel bin, ``spec`` is just copied from the
+input data and stddev cube. For a multi-spaxel bin, the sum and
 uncertainties of all individual spaxels in the bin are used.
 
 See :ref:`results-dict` for information on accessing and using this information.
