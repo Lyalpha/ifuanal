@@ -327,7 +327,7 @@ class IFUCube(object):
 
     def voronoi_bin(self, target_sn, lamb_low=5590., lamb_upp=5680.,
                     cont_lamb_low=None, cont_lamb_upp=None, clobber=False,
-                    min_sn=3):
+                    min_sn=3, weighted=False):
         """
         Apply the voronoi binning algorithm to the data cube.
 
@@ -355,6 +355,9 @@ class IFUCube(object):
             Whether to overwrite any existing binning results.
         min_sn : float, optional
             The minimum S/N of a spaxel to be considered for the algorithm.
+        weighted: bool, optional
+            Store the weighted-mean sum of the individual spaxels in each
+            bin. If ``false`` just return the arithmetic sum.
 
         Example
         -------
@@ -449,9 +452,10 @@ class IFUCube(object):
             x_mean, y_mean = x_mean[0], y_mean[0]
             nx, ny = self.nucleus - 0.5
             distances = ((x - nx)**2 + (y - ny)**2)**0.5
+            spec = self._get_bin_spectrum((x, y), weighted=weighted)
             bin_nums[bn] = {"spax": (x, y),
                             "mean": (x_mean, y_mean),
-                            "spec": self._get_bin_spectrum((x, y)),
+                            "spec": spec,
                             "dist_min": np.min(distances),
                             "dist_max": np.max(distances),
                             "dist_mean": ((x_mean - nx)**2
@@ -465,7 +469,8 @@ class IFUCube(object):
 
     def emission_line_bin(self, min_peak_flux, min_frac_flux, max_radius,
                           min_flux, min_npix=8, line_lamb=6562.8, border=3,
-                          smooth=0.5, plot=True, clobber=False, **kwargs):
+                          smooth=0.5, plot=True, clobber=False, weighted=False,
+                          **kwargs):
         """
         Apply the HII explorer [SFS]_ binning algorithm to the datacube.
 
@@ -514,6 +519,9 @@ class IFUCube(object):
             Whether to make a plot of the continuum, filter, line and bin maps.
         clobber : bool, optional
             Whether to overwrite any existing binning results.
+        weighted: bool, optional
+            Store the weighted-mean sum of the individual spaxels in each
+            bin. If ``false`` just return the arithmetic sum.
         filter_width : float, optional
             The filter width to extract around the emission line.
         cont_width : float, optional
@@ -625,9 +633,10 @@ class IFUCube(object):
                 nx, ny = self.nucleus - 0.5
                 distances = ((xy_spax[0] - nx)**2
                              + (xy_spax[1] - ny)**2)**0.5
+                spec = self._get_bin_spectrum(xy_spax, weighted=weighted)
                 bin_nums[bn] = {"spax": xy_spax,
                                 "mean": xy_mean,
-                                "spec": self._get_bin_spectrum(xy_spax),
+                                "spec": spec,
                                 "dist_min": np.min(distances),
                                 "dist_max": np.max(distances),
                                 "dist_mean": ((xy_mean[0] - nx)**2
@@ -671,7 +680,8 @@ class IFUCube(object):
     def nearest_bin(self, min_peak_flux, max_radius, min_flux, min_frac_flux=0,
                     min_npix=8, line_lamb=6562.8, weighted=True,
                     weight_pow=1/3., niter=1, max_filter_size=5, border=3,
-                    smooth=0.5, plot=True, clobber=False, **kwargs):
+                    smooth=0.5, plot=True, clobber=False, weighted=False,
+                    **kwargs):
         """
         Create bins based on pixels proximity to peaks, largely derived from
         [LRN]_.
@@ -742,6 +752,9 @@ class IFUCube(object):
             Whether to make a plot of the continuum, filter, line and bin maps.
         clobber : bool, optional
             Whether to overwrite any existing binning results.
+        weighted: bool, optional
+            Store the weighted-mean sum of the individual spaxels in each
+            bin. If ``false`` just return the arithmetic sum.
         filter_width : float, optional
             The filter width to extract around the emission line.
         cont_width : float, optional
@@ -878,9 +891,10 @@ class IFUCube(object):
             nx, ny = self.nucleus - 0.5
             distances = ((xy_spax[0] - nx)**2
                          + (xy_spax[1] - ny)**2)**0.5
+            spec = self._get_bin_spectrum(xy_spax, weighted=weighted)
             bin_nums[bn] = {"spax": xy_spax,
                             "mean": xy_mean,
-                            "spec": self._get_bin_spectrum(xy_spax),
+                            "spec": spec,
                             "dist_min": np.min(distances),
                             "dist_max": np.max(distances),
                             "dist_mean": ((xy_mean[0] - nx)**2
@@ -919,7 +933,7 @@ class IFUCube(object):
         print()
         print("found {} bins".format(len(bin_nums)))
 
-    def add_custom_bin(self, centre, r):
+    def add_custom_bin(self, centre, r, weighted=False):
         """
         Create a custom bin to analyse in addition to the vonoroi bins.
 
@@ -931,6 +945,8 @@ class IFUCube(object):
             Length 2 array giving the x,y centre of the bin
         r : int
             The radius of the bin in pixels.
+        weighted : bool, optional
+            Whether to return the weighted-mean sum or arthimetic sum spectrum.
 
         Example
         -------
@@ -955,9 +971,10 @@ class IFUCube(object):
 
         nx, ny = self.nucleus - 0.5
         distances = ((xy_spax[0] - nx)**2 + (xy_spax[1] - ny)**2)**0.5
+        spec = self._get_bin_spectrum(xy_spax, weighted=weighted)
         self.results["bin"][bn] = {"spax": xy_spax,
                                    "mean": (x_cen, y_cen),
-                                   "spec": self._get_bin_spectrum(xy_spax),
+                                   "spec": spec,
                                    "dist_min": np.min(distances),
                                    "dist_max": np.max(distances),
                                    "dist_mean": ((x_cen - nx)**2
@@ -1053,15 +1070,15 @@ class IFUCube(object):
 
         return spec
 
-    def _get_weighted_spectrum(self, x, y):
+    def _get_multi_spectrum(self, x, y, weighted=False):
         """
-        Return the weighted mean spectrum for spaxels at locations ``x``,
+        Return the summed spectrum over multiple spaxels at locations ``x``,
         ``y``.
 
         Similar to ``_get_single_spectrum`` except ``x`` and ``y`` are arrays.
         The single spectra given by these locations are combined using the
-        weighted mean of the fluxes. Returns array of same form as
-        ``_get_single_spectrum``.
+        weighted-mean or arithmetic sum of the fluxes depending on `weighted``.
+        Returns array of same form as ``_get_single_spectrum``.
 
         """
         x = np.ravel(np.asarray(x))
@@ -1086,20 +1103,24 @@ class IFUCube(object):
         # Use masked arrays to cover the nans while preserving shape
         spaxels_flux_ma = np.ma.masked_array(spaxels_flux, bad_idx)
         spaxels_stddev_ma = np.ma.masked_array(spaxels_stddev, bad_idx)
-        # Calculate the weighted mean and uncertainty
-        w = 1/spaxels_stddev_ma**2
-        spec[:, 1] = np.ma.average(spaxels_flux_ma, weights=w, axis=1) * x.size
-        spec[:, 2] = 1/np.sum(w, axis=1)**0.5 * x.size
+        if weighted:
+            # Calculate the weighted mean and uncertainty
+            w = 1/spaxels_stddev_ma**2
+            spec[:, 1] = np.ma.average(spaxels_flux_ma, weights=w, axis=1) * x.size
+            spec[:, 2] = 1/np.sum(w, axis=1)**0.5 * x.size
+        else:
+            spec[:, 1] = np.sum(spaxels_flux_ma, axis=1)
+            spec[:, 2] = np.sqrt(np.sum(spaxels_stddev_ma**2, axis=1))
         # STARLIGHT ignores flags >=2
         spec[:, 3] = bad_lamb.astype("int") * 2
 
         return spec
 
-    def _get_bin_spectrum(self, xy):
+    def _get_bin_spectrum(self, xy, weighted=False):
         """
         Return the spectrum for coordinates xy.
 
-        Calls ``_get_single_spectrum`` or ``_get_weighted_spectrum`` as
+        Calls ``_get_single_spectrum`` or ``_get_multi_spectrum`` as
         appropriate (i.e. if number of spaxels in bin is 1 or >1).
 
         Parameters
@@ -1107,14 +1128,20 @@ class IFUCube(object):
         xy : Nx2 array
             The ([x0, x1.. xN], [y0, y1, yN]) pixel coordinates of the spectrum
             to return.
+        weighted : bool, optional
+            If ``True`` return the weight-mean sum spectrum, otherwise simply the
+            arithmetic sum.
 
         Returns
         -------
         spec : 4xM array
             see :meth:`ifuanal.IFUCube._get_single_spectrum` and
-            :meth:`ifuanal.IFUCube._get_weighted_spectrum`
+            :meth:`ifuanal.IFUCube._get_multi_spectrum`
         """
         n_spax = len(xy[0])
+        if len(xy[1]) != n_spax:
+            print("must have same number of x and y coordinates")
+            return None
         if n_spax == 0:
             print("no spaxels found!")
             return None
@@ -1122,8 +1149,7 @@ class IFUCube(object):
             # yield the single spaxel's spectrum
             spec = self._get_single_spectrum(xy[0], xy[1])
         else:
-            # yield the weighted spectrum of these positions
-            spec = self._get_weighted_spectrum(xy[0], xy[1])
+            spec = self._get_multi_spectrum(xy[0], xy[1], weighted=weighted)
         return spec
 
     def run_starlight(self, bin_num=None, base_name="bc03", lamb_low=5590.,
