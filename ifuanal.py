@@ -2743,11 +2743,11 @@ def get_line_map(data_cube, lamb, line_lamb, filter_width=30, cont_width=30,
     # Make maps of the three wavelength windows by averaging over the spectral
     # axis
     filter_map = np.nansum(data_cube.data[idx_low_filt:idx_upp_filt, :, :],
-                        axis=0)
+                           axis=0)
     cont1_map = np.nansum(data_cube.data[idx_low_cont1:idx_upp_cont1, :, :],
-                       axis=0) * (filt_width/cont1_width)
+                          axis=0) * (filt_width/cont1_width)
     cont2_map = np.nansum(data_cube.data[idx_low_cont2:idx_upp_cont2, :, :],
-                       axis=0) * (filt_width/cont2_width)
+                          axis=0) * (filt_width/cont2_width)
     # Determine the mean wavelength of the continuum windows
     cont1_mean = np.average((low_cont1, upp_cont1))
     cont2_mean = np.average((low_cont2, upp_cont2))
