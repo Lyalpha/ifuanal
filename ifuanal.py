@@ -678,7 +678,7 @@ class IFUCube(object):
         print("found {} bins".format(len(bin_nums)))
 
     def nearest_bin(self, min_peak_flux, max_radius, min_flux, min_frac_flux=0,
-                    min_npix=8, line_lamb=6562.8, weighted=True,
+                    min_npix=8, line_lamb=6562.8, dist_weighted=True,
                     weight_pow=1/3., niter=1, max_filter_size=5, border=3,
                     smooth=0.5, plot=True, clobber=False, weighted=False,
                     **kwargs):
@@ -727,7 +727,7 @@ class IFUCube(object):
         line_lamb : float, optional
             The wavelength of emission line to use (defaults to
             H\ :math:`\\alpha`).
-        weighted : bool, optional
+        dist_weighted : bool, optional
             Whether to weight the distance determination based on the fluxes
             around each peak.
         weight_pow : float, optional
@@ -852,7 +852,7 @@ class IFUCube(object):
         near_map[np.isnan(line_map) | toofar] = 0
 
         # Weight distances to reform bins if needed
-        if weighted:
+        if dist_weighted:
             print("weighting distances")
             # Calculate fluxes from un-weighted bins
             fluxes = ndimage.sum(line_map, near_map, range(1, n_peaks+1))
