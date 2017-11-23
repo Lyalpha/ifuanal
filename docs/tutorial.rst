@@ -441,6 +441,17 @@ Emission line fitting
 Emission line fitting is done with a set of single gaussians, one for each of
 the lines given in ``el_json`` (default `data/emission_lines.json`).
 
+.. NOTE::
+
+   At a minimum, the emission lines data must be ``{"Halpha":
+   [6562.77], "[NII]": [6583.45]}`` in order for the emission fitting
+   to run. The lines are used to tie other line fitted values and for
+   this reason the line ``6583.45`` should be the first entry for
+   ``[NII]`` if there are more than one used. Ordering for other
+   doublets, triplets doesn't matter. ``"Hbeta"`` is needed to
+   calculated a Balmer decrement extinction and other default entries
+   are needed for some included plotting functions.
+
 **The tl;dr version:** ::
 
   >>> cube.run_emission_lines()
@@ -710,12 +721,12 @@ the default ``el_json`` input (`data/emission_lines.json`) of: ::
      "Hbeta": [4861.33],
      "[OIII]": [4958.911, 5006.843],
      "Halpha": [6562.77],
-     "[NII]": [6548.05, 6583.45],
+     "[NII]": [6583.45, 6548.05],
      "[SII]": [6716.440, 6730.815]
     }
 
 produces the following entries: ``Hbeta_4861``, ``[OIII]_4959``,
-``[OIII]_5007``, ``[NII]_6548``, ``[NII]_6583``, ``Halpha_6563``,
+``[OIII]_5007``, ``[NII]_6583``, ``[NII]_6548``, ``Halpha_6563``,
 ``[SII]_6716``, ``[SII]_6731``. An example entry for line name ``line_xxxx``
 is shown below.
 
