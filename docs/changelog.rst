@@ -7,6 +7,11 @@ v0.4.dev
  * Added ``tmp_dir`` argument to :meth:`~ifuanal.IFUCube.run_starlight`
  * Added :meth:`~ifuanal.IFUCube.make_2dfits`
  * Allow :meth:`~ifuanal.IFUCube.mask_regions` radii to be floats
+ * Change required ``[NII]`` line from ``6548`` to ``6583``
+ * Change default summation of multi spaxel bins to remove weighting and added ``weighted`` argument to methods that create bins that can be set ``True`` to recover the weighted method
+
+   - Now multispaxel bins are just the arithmetic sum of individual spaxel
+     spectra
 
 v0.4.0
 ------
