@@ -2876,13 +2876,13 @@ def fit_emission_lines(fargs):
             el_init[sm].stddev.tied = (lambda x, sm=sm, sm0=sm0:
                                        (x[sm].mean
                                         * (x[sm0].stddev / x[sm0].mean)))
-        if sm in ("Halpha_6563_0", "[NII]_6548_0"):
+        if sm in ("Halpha_6563_0", "[NII]_6583_0"):
             continue
         # Tie the means of other lines to the anchor forbidden/balmer
         # line as appropriate
         if e.startswith("[") and e.endswith("]"):
             el_init[sm].mean.tied = lambda x, e=e, n=n: (el[e][n]
-                                    * x["[NII]_6548_0"].mean/el["[NII]"][0])
+                                    * x["[NII]_6583_0"].mean/el["[NII]"][0])
         else:
             el_init[sm].mean.tied = lambda x, e=e, n=n: (el[e][n]
                                     * x["Halpha_6563_0"].mean/el["Halpha"][0])
@@ -3014,7 +3014,7 @@ def _model_to_res_dict(model, el, fobs_norm, filtwidth, resid_fn):
     # lines in the uncert array
     param_idx = np.array(fitting._model_to_fit_params(model)[1])
     sm_balmer_idx = model.submodel_names.index("Halpha_6563_0")
-    sm_forbidden_idx = model.submodel_names.index("[NII]_6548_0")
+    sm_forbidden_idx = model.submodel_names.index("[NII]_6583_0")
     uncertb_idx = np.argwhere(param_idx == sm_balmer_idx*3)
     uncertf_idx = np.argwhere(param_idx == sm_forbidden_idx*3)
 
@@ -3034,7 +3034,7 @@ def _model_to_res_dict(model, el, fobs_norm, filtwidth, resid_fn):
         # does not return uncertainties for tied parameters
         sm_uncerts = np.empty(3)
         sm_uncerts[0] = fitted_uncerts[j] * fobs_norm  # amplitude
-        if sm in ("Halpha_6563_0", "[NII]_6548_0"):
+        if sm in ("Halpha_6563_0", "[NII]_6583_0"):
             j += 1
             sm_uncerts[1] = fitted_uncerts[j]  # mean
             j += 1
