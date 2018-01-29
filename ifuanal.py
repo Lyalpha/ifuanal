@@ -732,7 +732,7 @@ class IFUCube(object):
             around each peak.
         weight_pow : float, optional
             The power index used in the weighting of distances, requires
-            ``weighted = True``
+            ``dist_weighted = True``
         niter : int, optional
             Peaks within this number of pixels of a masked (nan) or <
             ``min_flux`` pixel will be removed. This can help eliminate noise
