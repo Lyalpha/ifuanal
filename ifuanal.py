@@ -384,6 +384,11 @@ class IFUCube(object):
             if not clobber:
                 print("bins already exist, use clobber=True to overwrite")
                 return
+
+        if self.nucleus is None:
+            print("run `set_nucleus` first")
+            return
+
         print("binning spaxels with Voronoi algorithm with "
               "S/N target of {}".format(target_sn))
 
@@ -547,6 +552,10 @@ class IFUCube(object):
 
         if min_flux >= min_peak_flux:
             print("min_peak_flux > min_flux is required")
+            return
+
+        if self.nucleus is None:
+            print("run `set_nucleus` first")
             return
 
         print("binning spaxels using HII explorer algorithm around emission "
@@ -782,6 +791,10 @@ class IFUCube(object):
             print("min_peak_flux > min_flux is required")
             return
 
+        if self.nucleus is None:
+            print("run `set_nucleus` first")
+            return
+
         print("binning spaxels using Nearest pixel algorithm around emission "
               "line {}".format(line_lamb))
 
@@ -956,6 +969,9 @@ class IFUCube(object):
         2. determine the ``plate_scale`` of the cube (arcsec/pixel)
         3. ``>>> cube.add_custom_bin(cube.nucleus, 3/plate_scale)``
         """
+        if self.nucleus is None:
+            print("run `set_nucleus` first")
+            return
 
         x_cen, y_cen = centre
         y, x = np.ogrid[-y_cen:self.data_shape[1]-y_cen,
