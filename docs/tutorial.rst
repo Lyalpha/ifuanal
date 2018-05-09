@@ -337,17 +337,16 @@ negative bin numbers beginning at ``-1`` in results.
 
 As an example we make an SDSS-like 2 arcsec fibre on the galaxy nucleus: ::
 
-  >>> cube.add_custom_bin([160.592, 166.442], 2/0.2)
+  >>> cube.add_custom_bin([160.592, 166.442], r=2/0.2)
   "added custom bin -1 to the list"
 
 where 0.2 is the pixel scale of MUSE in arcsecs. Once all fitting has been
 performed, the results for this bin (assuming it was the first custom bin to be
-added) can be accessed via the bin number -1 in the :ref:`results-dict`
+added) can be accessed via the bin number -1 in the :ref:`results-dict`.
 
-.. TODO::
-
-   Currently this is limited only to circular bins but arbitrary bins (by just
-   specifying a list of ``x`` and ``y`` pixel coordinates) should be added.
+Alternatively, instead of a radius, the specific ``x`` and ``y`` spaxels to
+include in the bin can be passed via ``xy`` - a centre is still required in
+this case.
 
 .. WARNING::
 

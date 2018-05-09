@@ -946,9 +946,12 @@ class IFUCube(object):
         print()
         print("found {} bins".format(len(bin_nums)))
 
-    def add_custom_bin(self, centre, r, weighted=False):
+    def add_custom_bin(self, centre, r=None, xy=None, weighted=False):
         """
-        Create a custom bin to analyse in addition to the vonoroi bins.
+        Create a custom bin to analyse. Either specify ``centre`` and
+        ``r`` to create a circular bin, or give list of x and y coordinates as
+        ``xy`` in order to select specific spaxels. For the ``xy`` specified
+        bins, a ``centre`` is still required and must be provided.
 
         Custom bins have negative values (beginning at -1) in all output etc.
 
@@ -956,8 +959,10 @@ class IFUCube(object):
         ----------
         centre : array_like
             Length 2 array giving the x,y centre of the bin
-        r : int
+        r : int, optional
             The radius of the bin in pixels.
+        xy : array_like, optional
+            Length 2 array of x and y pixels to use as the bin
         weighted : bool, optional
             Whether to return the weighted-mean sum or arthimetic sum spectrum.
 
@@ -974,9 +979,14 @@ class IFUCube(object):
             return
 
         x_cen, y_cen = centre
-        y, x = np.ogrid[-y_cen:self.data_shape[1]-y_cen,
-                        -x_cen:self.data_shape[2]-x_cen]
-        xy_spax = np.where(x*x + y*y <= r*r)[::-1]
+        if r is not None:
+            y, x = np.ogrid[-y_cen:self.data_shape[1]-y_cen,
+                            -x_cen:self.data_shape[2]-x_cen]
+            xy_spax = np.where(x*x + y*y <= r*r)[::-1]
+        elif xy is not None:
+            xy_spax = (np.atleast_1d(xy[0]), np.atleast_1d(xy[1]))
+        else:
+            print("either specify `r`, or `xy`")
 
         bn = -1
         try:
