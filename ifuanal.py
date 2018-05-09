@@ -979,11 +979,16 @@ class IFUCube(object):
         xy_spax = np.where(x*x + y*y <= r*r)[::-1]
 
         bn = -1
-        existing_bins = self._get_bin_nums("all")
-        while True:
-            if bn not in existing_bins:
-                break
-            bn -= 1
+        try:
+            existing_bins = self._get_bin_nums("all")
+        except KeyError:
+            # we have no bins created yet
+            self.results["bin"] = {}
+        else:
+            while True:
+                if bn not in existing_bins:
+                    break
+                bn -= 1
 
         nx, ny = self.nucleus - 0.5
         distances = ((xy_spax[0] - nx)**2 + (xy_spax[1] - ny)**2)**0.5
