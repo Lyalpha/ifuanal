@@ -306,6 +306,11 @@ The weighting of the distances can be turned off with ``weighted=False``.
 Voronoi binning
 ^^^^^^^^^^^^^^^
 
+.. NOTE::
+
+   Note working due to being unable to include a modified version of
+   voronoi in the release.
+
 `Voronoi tessellation <https://en.wikipedia.org/wiki/Voronoi_diagram>`_ is
 performed using the `Voronoi binning algorithm
 <http://www-astro.physics.ox.ac.uk/~mxc/software/>`_ to produce bins from
