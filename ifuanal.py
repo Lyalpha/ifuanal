@@ -455,7 +455,7 @@ class IFUCube(object):
             x, y, x_mean, y_mean, _bn = vor_output[idx].T
             x, y = x.astype("int"), y.astype("int")
             x_mean, y_mean = x_mean[0], y_mean[0]
-            nx, ny = self.nucleus - 0.5
+            nx, ny = self.nucleus
             distances = ((x - nx)**2 + (y - ny)**2)**0.5
             spec = self._get_bin_spectrum((x, y), weighted=weighted)
             bin_nums[bn] = {"spax": (x, y),
@@ -639,9 +639,9 @@ class IFUCube(object):
                 # We swap the x and y to FITS standard in the dict
                 xy_spax = np.where(bin_map == bn)[::-1]
                 xy_mean = (x, y)[::-1]
-                nx, ny = self.nucleus - 0.5
+                nx, ny = self.nucleus
                 distances = ((xy_spax[0] - nx)**2
-                             + (xy_spax[1] - ny)**2)**0.5
+                                 + (xy_spax[1] - ny)**2)**0.5
                 spec = self._get_bin_spectrum(xy_spax, weighted=weighted)
                 bin_nums[bn] = {"spax": xy_spax,
                                 "mean": xy_mean,
@@ -859,8 +859,7 @@ class IFUCube(object):
         goodlabeled_nearmap = (np.in1d(labeled_nearmap, good_labels)
                                .reshape(labeled_nearmap.shape))
         near_map[~goodlabeled_nearmap] = 0
-        # Perform grey closing to remove pixel 'holes' in the bins
-        near_map = ndimage.morphology.grey_closing(near_map, size=(3, 3))
+        
         # Mask nans and still abide by distance
         near_map[np.isnan(line_map) | toofar] = 0
 
@@ -889,6 +888,8 @@ class IFUCube(object):
             near_map[(~_goodlblmap) & (_nrmap > 0)] = 0
             peak_val = line_map[xy[0], xy[1]]
             near_map[(line_map < min_frac_flux * peak_val) & (_nrmap > 0)] = 0
+        # Perform grey closing to remove pixel 'holes' in the bins
+        near_map = ndimage.morphology.grey_closing(near_map, size=(3, 3))
         # Change back to zero-index labels and nans for bad pixels
         near_map[near_map == 0] = np.nan
         near_map -= 1
@@ -901,7 +902,7 @@ class IFUCube(object):
             sys.stdout.flush()
             xy_spax = np.where(near_map == bn)[::-1]
             xy_mean = (x, y)[::-1]
-            nx, ny = self.nucleus - 0.5
+            nx, ny = self.nucleus
             distances = ((xy_spax[0] - nx)**2
                          + (xy_spax[1] - ny)**2)**0.5
             spec = self._get_bin_spectrum(xy_spax, weighted=weighted)
@@ -1000,7 +1001,7 @@ class IFUCube(object):
                     break
                 bn -= 1
 
-        nx, ny = self.nucleus - 0.5
+        nx, ny = self.nucleus
         distances = ((xy_spax[0] - nx)**2 + (xy_spax[1] - ny)**2)**0.5
         spec = self._get_bin_spectrum(xy_spax, weighted=weighted)
         self.results["bin"][bn] = {"spax": xy_spax,
@@ -2182,6 +2183,65 @@ class IFUCube(object):
                      bbox_inches="tight")
         print("plot saved to {}_metallicity_{}.pdf".format(self.base_name,
                                                            indicator))
+
+    def plot_line_ratio(self, numerator, denominator, snr_limit=2):
+        """
+        Plot line flux ratios maps.
+
+        A map of the host is shown with bins colour coded by the chosen
+        line ratio. Lines can be summed in the numerator or denominator
+        by providing multiple lines. Line names to be given as they
+        appear in the emission line results dict. The validity of line
+        names will be checked against the results of bin number 0.
+
+        Parameters
+        ----------
+        numerator : list
+            Name(s) of emission lines to for the numerator of the ratio
+        denominator : list
+            Name(s) of emission lines to for the denominator of the ratio
+        snr_limit : float
+            Minimum SNR of all lines for a bin to have its ratio plotted
+
+        Example
+        -------
+        Produce a [SII]6716+6731:H\:math:`\\alpha` ratio plot:
+
+        ``>>> IFUCube.plot_line_ratio(numerator=["[SII]_6716",
+                                                   "[SII]_6731"],
+                                      denominator=["Halpha_6563",])``
+        """
+        valid_lines = self.results["bin"][0]["emission"]["lines"].keys()
+        lines = numerator+denominator
+        if not set(lines).issubset(valid_lines):
+            raise AttributeError("Valid line are {}".format(valid_lines))
+
+        bin_nums, n_custom = self._get_bin_nums("nobad", custom=True)
+        # Initialise an empty map to populate with ratio
+        ratiomap = np.full(self.data_cube.shape[1:], np.nan)
+        # Store the metallicity values and uncertainties
+        for i, bn in enumerate(bin_nums):
+            bin_res = self.results["bin"][bn]
+            emlines = bin_res["emission"]["lines"]
+            if any([emlines[line]["snr"] < snr_limit for line in lines]):
+                continue
+            n_flux = sum([emlines[line]["flux"][0] for line in numerator])
+            d_flux = sum([emlines[line]["flux"][0] for line in denominator])
+            ratiomap[bin_res["spax"][::-1]] = n_flux/d_flux
+
+        plt.close("all")
+        ax1 = plt.subplot(111, adjustable="box-forced")
+        plt.imshow(ratiomap, origin="lower", cmap="viridis")
+        plt.colorbar(label="({}) / ({})".format("+".join(numerator).replace("_", ""),
+                                                "+".join(denominator).replace("_", "")),
+                     orientation="horizontal").ax.tick_params(labelsize=10)
+        ax1.autoscale(False)
+
+        plot_suffix = "_ratio_{}__{}.pdf".format("+".join(numerator),
+                                                 "+".join(denominator))
+        plt.savefig(self.base_name+plot_suffix,
+                    bbox_inches="tight")
+        print("plot saved to {}".format(self.base_name+plot_suffix))
 
     def plot_bpt(self, snrlimit=3):
         """
