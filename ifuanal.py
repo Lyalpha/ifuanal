@@ -569,7 +569,7 @@ class IFUCube(object):
         # Find peaks in the line_map, these can be quite close together
         # as we will grow/merge them later with the HII explorer algorithm
         if smooth > 0:
-            gauss = Gaussian2DKernel(stddev=smooth)
+            gauss = Gaussian2DKernel(x_stddev=smooth)
             smooth_line_map = convolve(line_map, gauss,
                                        boundary="extend")
         else:
@@ -803,7 +803,7 @@ class IFUCube(object):
         filt_map, cont_map, line_map = maps
         # Gaussian smooth if needed
         if smooth > 0:
-            gauss = Gaussian2DKernel(stddev=smooth)
+            gauss = Gaussian2DKernel(x_stddev=smooth)
             smooth_line_map = convolve(line_map, gauss,
                                        boundary="extend")
         else:
