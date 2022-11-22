@@ -2879,7 +2879,7 @@ def fit_starlight(fargs):
     sys.stdout.flush()
     out_file = os.path.basename(spec_file)+"_out"
     # Write a grid file for starlight (see manual)
-    with tempfile.NamedTemporaryFile(prefix="grid_", dir=tmp_dir,
+    with tempfile.NamedTemporaryFile(prefix="grid_", dir=tmp_dir, mode="w",
                                      delete=False) as grid_file:
         # we need to specifically set the precision and manually calculate the
         # wavelength window for starlight to model - in some cases the rounding
