@@ -2548,7 +2548,7 @@ class IFUCube(object):
         try:
             cls = IFUCube.__new__(IFUCube)
             with open(pkl_file, "rb") as pkl_data:
-                cls.__dict__ = pickle.load(pkl_data)
+                cls.__dict__ = pickle.load(pkl_data, encoding="latin1")
         except IOError:
             raise IOError("Couldn't create instance from pickle file"
                           " {}".format(pkl_file))
