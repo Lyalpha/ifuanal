@@ -657,8 +657,7 @@ class IFUCube(object):
         if plot:
             plt.close()
             binfig, ax = plt.subplots(1, 4, sharex=True, sharey=True,
-                                      figsize=(16, 4),
-                                      subplot_kw={"adjustable": "box-forced"})
+                                      figsize=(16, 4), subplot_kw={"aspect": "equal"})
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore", UserWarning)
                 ax[0].imshow(filt_map, origin="lower",
@@ -918,8 +917,7 @@ class IFUCube(object):
         if plot:
             plt.close()
             binfig, ax = plt.subplots(1, 4, sharex=True, sharey=True,
-                                      figsize=(16, 4),
-                                      subplot_kw={"adjustable": "box-forced"})
+                                      figsize=(16, 4), subplot_kw={"aspect": "equal"})
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore", UserWarning)
                 ax[0].imshow(filt_map, origin="lower",
@@ -1062,7 +1060,7 @@ class IFUCube(object):
         if bins not in ("all", "nocontbad", "nobad"):
             print("bins must be one of ('all', 'nocontbad', 'nobad')")
             return
-        bin_nums = np.sort(self.results["bin"].keys())
+        bin_nums = np.sort(list(self.results["bin"].keys()))
         if bins in ("nocontbad", "nobad"):
             idx_remove = []
             for i, bn in enumerate(bin_nums):
@@ -1911,7 +1909,7 @@ class IFUCube(object):
             old[bin_res["spax"][::-1]] = oldlightfrac
 
         plt.close("all")
-        axyoung = plt.subplot(311, adjustable="box-forced")
+        axyoung = plt.subplot(311, aspect="equal")
         plt.imshow(young, origin="lower", interpolation="none", cmap="Blues",
                    vmin=0, vmax=np.nanmax(young))
         axyoung.autoscale(False)
@@ -1920,7 +1918,7 @@ class IFUCube(object):
         plt.colorbar(label="x$_\\textrm{j}$ [\%]")
 
         axinter = plt.subplot(312, sharex=axyoung, sharey=axyoung,
-                              adjustable="box-forced")
+                              aspect="equal")
         plt.imshow(inter, origin="lower", interpolation="none", cmap="Greens",
                    vmin=0, vmax=np.nanmax(inter))
         axinter.autoscale(False)
@@ -1929,7 +1927,7 @@ class IFUCube(object):
         plt.colorbar(label="x$_\\textrm{j}$ [\%]")
 
         axold = plt.subplot(313, sharex=axyoung, sharey=axyoung,
-                            adjustable="box-forced")
+                            aspect="equal")
         plt.imshow(old, origin="lower", interpolation="none", cmap="Reds",
                    vmin=0, vmax=np.nanmax(old))
         axold.autoscale(False)
@@ -1980,14 +1978,14 @@ class IFUCube(object):
         v0min, v0max = np.nanmin(v0), np.nanmax(v0)
         v0cmap = shiftedColorMap(cm.coolwarm,
                                  midpoint=(1. - v0max/(v0max + abs(v0min))))
-        ax1 = plt.subplot(121, adjustable="box-forced")
+        ax1 = plt.subplot(121, aspect="equal")
         plt.imshow(v0, origin="lower", interpolation="none", cmap=v0cmap)
         plt.colorbar(label="$v_\\star$ [km~s$^{-1}$]",
                      orientation="horizontal").ax.tick_params(labelsize=10)
         ax1.autoscale(False)
         plt.plot(self.nucleus[0], self.nucleus[1], "kx", markersize=10)
 
-        ax2 = plt.subplot(122, sharex=ax1, sharey=ax1, adjustable="box-forced")
+        ax2 = plt.subplot(122, sharex=ax1, sharey=ax1, aspect="equal")
         plt.imshow(vd, origin="lower", interpolation="none", cmap="afmhot_r")
         plt.colorbar(label="$\\sigma_\\star$ [km~s$^{-1}$]",
                      orientation="horizontal").ax.tick_params(labelsize=10)
@@ -2230,7 +2228,7 @@ class IFUCube(object):
             ratiomap[bin_res["spax"][::-1]] = n_flux/d_flux
 
         plt.close("all")
-        ax1 = plt.subplot(111, adjustable="box-forced")
+        ax1 = plt.subplot(111, aspect="equal")
         plt.imshow(ratiomap, origin="lower", cmap="viridis")
         plt.colorbar(label="({}) / ({})".format("+".join(numerator).replace("_", ""),
                                                 "+".join(denominator).replace("_", "")),
@@ -2492,7 +2490,7 @@ class IFUCube(object):
                                                     - smax/(smax + abs(smin))))
         else:
             stellarcmap = cm.Reds
-        ax1 = plt.subplot(121, adjustable="box-forced")
+        ax1 = plt.subplot(121, aspect="equal")
         plt.imshow(stellar, origin="lower", interpolation="none",
                    cmap=stellarcmap)
         plt.colorbar(label=label.format("\\star"),
@@ -2506,7 +2504,7 @@ class IFUCube(object):
                                       midpoint=(1. - gmax/(gmax + abs(gmin))))
         else:
             gascmap = cm.Reds
-        ax2 = plt.subplot(122, sharex=ax1, sharey=ax1, adjustable="box-forced")
+        ax2 = plt.subplot(122, sharex=ax1, sharey=ax1, aspect="equal")
         plt.imshow(gas, origin="lower", interpolation="none", cmap=gascmap)
         plt.colorbar(label=label.format("\\textrm{gas}"),
                      orientation="horizontal").ax.tick_params(labelsize=10)
