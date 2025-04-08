@@ -1,17 +1,13 @@
 """
-IFUANAL
+ifuanal
 
-For the analysis of IFU data cubes.
+analysis of IFU data cubes
 """
-
-from __future__ import print_function
-
-__version__ = "0.5.1"
-__author__ = "J. Lyman"
-
+from functools import reduce
 from itertools import repeat, cycle, product
 import json
 import math
+import multiprocessing as mp
 import operator
 import os
 import re
@@ -21,23 +17,22 @@ import subprocess
 import sys
 import warnings
 
-from astropy.constants import c
+from astropy.constants import c as speed_of_light
 from astropy.convolution import convolve, Gaussian2DKernel
 from astropy.coordinates import SkyCoord
 from astropy.io import fits
 from astropy.modeling import models, fitting
 import astropy.units as u
 import astropy.wcs as wcs
+import dill as pickle
 import matplotlib.pyplot as plt
-from matplotlib import gridspec, ticker, cm, colors, rc
 import numpy as np
+from matplotlib import gridspec, ticker, cm, colors, rc
 from scipy.interpolate import interp1d
 from scipy import ndimage
 from scipy.spatial.distance import cdist
+from vorbin.voronoi_2d_binning import voronoi_2d_binning
 
-from voronoi import voronoi
-import dill as pickle
-import multiprocessing as mp
 
 # Stop numpy RuntimeWarnings (mainly to do with nans)
 np.seterr("ignore")
@@ -61,7 +56,7 @@ RANDSEED = 999
 REDLAW = "CCM"
 
 # Speed of light in km/s
-ckms = c.to("km/s").value
+ckms = speed_of_light.to("km/s").value
 
 # Make plots prettier
 rc('font', **{'family': 'serif', 'serif': ['Times New Roman'], 'size': 14})
@@ -278,16 +273,15 @@ class IFUCube(object):
             raise ValueError("box must be fully within the image, use "
                              "box_size=0 to force a location outside "
                              "the FOV.")
-            return
 
         # Find the nearest sampled wavelengths to our limits
         idx_low = np.abs(self.lamb - lamb_low).argmin()
         idx_upp = np.abs(self.lamb - lamb_upp).argmin() + 1
 
         # Cutout the subarray then sum and normalise it
-        cutout = self.data_cube.data[:, yc-box_size:yc+box_size+1,
-                                     xc-box_size:xc+box_size+1]
-        z = np.sum(cutout[idx_low:idx_upp], axis=0)
+        cutout = self.data_cube.data[:, int(yc-box_size):int(yc+box_size)+1,
+                                     int(xc-box_size):int(xc+box_size)+1]
+        z = np.nanmedian(cutout[idx_low:idx_upp], axis=0)
         z /= np.max(z)
         y, x = np.mgrid[:z.shape[0], :z.shape[1]]
 
@@ -439,9 +433,12 @@ class IFUCube(object):
 
         # Call the voronoi binning script
         vor_plot = self.base_name + "_bins_voronoi.pdf"
-        res = voronoi.voronoi_2d_binning(x, y, sig, noi, targetSN=target_sn,
-                                         cvt=True, pixelsize=1, plot=vor_plot,
-                                         quiet=False, n_cpu=self.n_cpu)
+        rc('lines', markersize=2)
+        res = voronoi_2d_binning(x, y, sig, noi, target_sn=target_sn,
+                                         cvt=True, pixelsize=1, plot=True,
+                                         quiet=False)
+        plt.savefig(vor_plot)
+        rc('lines', markersize=14)
         bin_num, x_node, y_node, x_bar, y_bar, bin_sn, n_pix, scale = res
 
         vor_output = np.column_stack([x, y, x_bar[bin_num], y_bar[bin_num],
@@ -1482,13 +1479,13 @@ class IFUCube(object):
                 # Get the continuum level with a `cont_order` polynomial
                 # fitted over a +/- 100AA window about the line and sample
                 # at the line's mean and correct for normalisation
-                low_idx = max(np.abs(self.lamb - (mean - 100)).argmin(), 0)
-                upp_idx = min(np.abs(self.lamb - (mean + 100)).argmin(),
-                              len(self.lamb))
+                low_idx = int(max(np.abs(self.lamb - (mean - 100)).argmin(), 0))
+                upp_idx = int(min(np.abs(self.lamb - (mean + 100)).argmin(),
+                              len(self.lamb)))
                 # Remove pixels that were masked/clipped in continuum fitting
                 cont_px = bin_res_c["sl_spec"][low_idx:upp_idx, 3] > 0
-                if ((np.sum(cont_px[:len(cont_px)/2]) < 10 or
-                     np.sum(cont_px[len(cont_px)/2:]) < 10)):
+                if ((np.sum(cont_px[:int(len(cont_px)/2)]) < 10) or
+                        (np.sum(cont_px[int(len(cont_px)/2):]) < 10)):
                     # if we don't have enough good continuum fit pixels in the
                     # window then just take everything outside the emission
                     # line mask
@@ -1868,7 +1865,7 @@ class IFUCube(object):
         slfig.tight_layout()
         slfig.subplots_adjust(hspace=0.1)
         slfig.savefig(self.base_name+"_sl_fit_{}.png".format(bin_num),
-                      bbox_inches="tight", dpi=300, additional_artists=(lgnd,))
+                      bbox_inches="tight", dpi=300)
         print("plot saved to {}_sl_fit_{}.png".format(self.base_name, bin_num))
 
     def plot_yio(self, age1=5e8, age2=5e9):
@@ -2944,7 +2941,7 @@ def fit_emission_lines(fargs):
     else:
         resid_fn = 0.0
 
-    # Contruct a model based on our emission lines
+    # Construct a model based on our emission lines
     el_init = _get_emline_model(el).rename(bin_num)
     # Add bounds and ties to the parameters prior to fitting
     for sm in el_init.submodel_names:
@@ -2962,9 +2959,9 @@ def fit_emission_lines(fargs):
             # stddev of the 0th line
             wl0 = el[e][0]
             sm0 = "{}_{:.0f}_0".format(e, wl0)
-            el_init[sm].stddev.tied = (lambda x, sm=sm, sm0=sm0:
-                                       (x[sm].mean
-                                        * (x[sm0].stddev / x[sm0].mean)))
+            el_init[sm].stddev.tied = (lambda x, _sm=sm, _sm0=sm0:
+                                       (x[_sm].mean
+                                        * (x[_sm0].stddev / x[_sm0].mean)))
         if sm in ("Halpha_6563_0", "[NII]_6583_0"):
             continue
         # Tie the means of other lines to the anchor forbidden/balmer
@@ -2998,7 +2995,7 @@ def fit_emission_lines(fargs):
     stddev_init = np.asarray(np.array(vd_init)/ckms)
     # Make combinations of all parameter initial guesses.
     param_comb = list(product(amp_init, offset_init, stddev_init))
-    dof = len(fitting._model_to_fit_params(el_init)[0])
+    dof = len(fitting.model_to_fit_params(el_init)[0])
     chi2dof = 1e50
     best_fit = None
     # Perform minimisation with LevMar fitter for each combo to find ~global
@@ -3030,7 +3027,7 @@ def fit_emission_lines(fargs):
 
     # We cannot put constraints on the parameters and still get a covariance
     # matrix, so here we correct any negative amplitudes since these are
-    # suppose to be emission features
+    # supposed to be emission features
     for sm in best_fit.submodel_names:
         if best_fit[sm].amplitude.value <= 0:
             best_fit[sm].amplitude.value = 0
@@ -3093,7 +3090,7 @@ def _model_to_res_dict(model, el, fobs_norm, filtwidth, resid_fn):
     except ValueError:
         print("no covariance matrix computed for bin {}, cannot"
               " compute fit uncertainties".format(model.name))
-        dof = len(fitting._model_to_fit_params(model)[0])
+        dof = len(fitting.model_to_fit_params(model)[0])
         fitted_uncerts = np.full(dof, np.nan)
         res["bad"] = 1
     else:
@@ -3101,11 +3098,11 @@ def _model_to_res_dict(model, el, fobs_norm, filtwidth, resid_fn):
 
     # Find the location of our balmer and forbidden offset anchor
     # lines in the uncert array
-    param_idx = np.array(fitting._model_to_fit_params(model)[1])
+    param_idx = np.array(fitting.model_to_fit_params(model)[1])
     sm_balmer_idx = model.submodel_names.index("Halpha_6563_0")
     sm_forbidden_idx = model.submodel_names.index("[NII]_6583_0")
-    uncertb_idx = np.argwhere(param_idx == sm_balmer_idx*3)
-    uncertf_idx = np.argwhere(param_idx == sm_forbidden_idx*3)
+    uncertb_idx = np.flatnonzero(param_idx == sm_balmer_idx*3)[0]
+    uncertf_idx = np.flatnonzero(param_idx == sm_forbidden_idx*3)[0]
 
     res["lines"] = {}
     j = 0
@@ -3116,8 +3113,8 @@ def _model_to_res_dict(model, el, fobs_norm, filtwidth, resid_fn):
         res["lines"][name] = {}
         sm_res = res["lines"][name]
         # Store the amplitude, mean and stddev of the gaussians
-        sm_res["fit_params"] = model.parameters[i*3:i*3+3]
-        sm_res["fit_params"][0] *= fobs_norm  # remove amp normalisation
+        sm_res["fit_params"] = model.parameters[i*3:i*3+3].copy()
+        sm_res["fit_params"][0] = fobs_norm * sm_res["fit_params"][0]  # remove amp normalisation
         # Retrieve uncertainties using indexes of our
         # primary balmer/forbidden lines since the fitting
         # does not return uncertainties for tied parameters
@@ -3143,7 +3140,7 @@ def _model_to_res_dict(model, el, fobs_norm, filtwidth, resid_fn):
                     wl0 = el[e][0]
                     sm0 = "{}_{:.0f}_0".format(e, wl0)
                     sm0_idx = model.submodel_names.index(sm0)
-                    uncert0_idx = np.argwhere(param_idx == sm0_idx*3)
+                    uncert0_idx = np.flatnonzero(param_idx == sm0_idx*3)[0]
                     sm_uncerts[2] = fitted_uncerts[uncert0_idx+1]  # stddev
 
         # Store the rest wavelength to calculate offsets later
