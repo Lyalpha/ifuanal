@@ -36,7 +36,8 @@ extensions = [
     'sphinx.ext.viewcode',
     'sphinx.ext.autodoc',
     'sphinx.ext.napoleon',
-    'sphinx.ext.graphviz'
+    'sphinx.ext.graphviz',
+    'sphinx_rtd_theme',
 ]
 napoleon_numpy_docstring = True
 # Napoleon correctly handle multiple arguments with same description
@@ -77,7 +78,7 @@ release = u'latest'
 #
 # This is also used if you do content translation via gettext catalogs.
 # Usually you set "language" from the command line for these cases.
-language = None
+language = 'en'
 
 # There are two options for replacing |today|: either, you set today to some
 # non-false value, then it is used:
