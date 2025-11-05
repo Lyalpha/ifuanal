@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #
-# IFUANAL documentation build configuration file, created by
+# ifuanal documentation build configuration file, created by
 # sphinx-quickstart on Tue Jul 12 16:09:37 2016.
 #
 # This file is execfile()d with the current directory set to its
@@ -60,7 +60,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = u'ifuanal'
-copyright = u'2016, Joe Lyman'
+copyright = u'2025, Joe Lyman'
 author = u'Joe Lyman'
 
 # The version info for the project you're documenting, acts as replacement for
@@ -322,7 +322,7 @@ man_pages = [
 #  dir menu entry, description, category)
 texinfo_documents = [
     (master_doc, 'ifuanal', u'ifuanal Documentation',
-     author, 'IFUANAL', 'resolved galaxy IFU data analysis with python.',
+     author, 'ifuanal', 'resolved galaxy IFU data analysis with python.',
      'Miscellaneous'),
 ]
 
